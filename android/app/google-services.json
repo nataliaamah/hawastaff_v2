@@ -1,44 +1,26 @@
 {
   "project_info": {
-    "project_number": "297463205489",
-    "project_id": "hawastaff-b703d",
-    "storage_bucket": "hawastaff-b703d.appspot.com"
+    "project_number": "412192301224",
+    "project_id": "hawa-24",
+    "storage_bucket": "hawa-24.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:297463205489:android:f71331f08451d7938355d0",
+        "mobilesdk_app_id": "1:412192301224:android:8f0dde3e43b709131c229d",
         "android_client_info": {
-          "package_name": "com.example.hawastaff"
+          "package_name": "com.hawa.application"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "297463205489-89c3i8f7mnnbrkl803vk6qmmineqihnb.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.hawastaff",
-            "certificate_hash": "53038ea624a692632daab356f408dbd41c788524"
-          }
-        },
-        {
-          "client_id": "297463205489-svstmppl87spigg4ik5mrt51v6r021lj.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyD7QiWABnjWghHcJRUsMtGg8YWrcXEycSk"
+          "current_key": "AIzaSyBI4sUEiu_uXYlDCRreSnsMC9oZGsT0D8c"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "297463205489-svstmppl87spigg4ik5mrt51v6r021lj.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }
