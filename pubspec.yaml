@@ -8,13 +8,6 @@ version: 1.0.0+1
 
 environment:
   sdk: '>=3.3.2 <4.0.0'
-
-# Dependencies specify other packages that your package needs in order to work.
-# To automatically upgrade your package dependencies to the latest versions
-# consider running `flutter pub upgrade --major-versions`. Alternatively,
-# dependencies can be manually updated by changing the version numbers below to
-# the latest version available on pub.dev. To see which dependencies have newer
-# versions available, run `flutter pub outdated`.
 dependencies:
   flutter:
     sdk: flutter
@@ -32,9 +25,6 @@ dev_dependencies:
 
 
 flutter:
-
-  # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
   uses-material-design: true
-
+  assets:
+    - assets/backArrow.png

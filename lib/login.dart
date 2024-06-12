@@ -98,25 +98,27 @@ class _StaffLoginPageState extends State<StaffLoginPage> {
         backgroundColor: const Color.fromARGB(255, 10, 38, 39),
         resizeToAvoidBottomInset: false,
         appBar: AppBar(
-          leading: IconButton(
-            icon: Image.asset('assets/images/backArrow.png'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-          ),
+          leading:IconButton(
+              icon: Image.asset('assets/backArrow.png'),
+              iconSize: 20,
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
         body: Container(
           width: double.maxFinite,
-          padding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0),
+          padding: EdgeInsets.symmetric(horizontal: 20.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
+              SizedBox(height: 100,),
               Align(
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
-                  width: 300.0,
+                  width: 200.0,
                   child: RichText(
                     text: TextSpan(
                       children: [
