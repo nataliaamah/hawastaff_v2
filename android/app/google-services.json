@@ -12,7 +12,20 @@
           "package_name": "com.hawa.application"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "412192301224-amdpfn389u11bta0lm31veuie4ue0hpj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hawa.application",
+            "certificate_hash": "1234567890abcdef1234567890abcdef12345678"
+          }
+        },
+        {
+          "client_id": "412192301224-di6je6krheijmd1956mv7e5aiajgck1a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBI4sUEiu_uXYlDCRreSnsMC9oZGsT0D8c"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "412192301224-di6je6krheijmd1956mv7e5aiajgck1a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
