@@ -217,11 +217,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
       return 'Unknown Time';
     }
     final date = timestamp.toDate();
-    final now = DateTime.now();
-    if (date.year != now.year) {
-      return DateFormat('d/MM/yyyy').format(date);
-    }
-    return DateFormat('d/MM').format(date);
+    return DateFormat('d/MM/yyyy').format(date) + ' ' + DateFormat('h:mm a').format(date);
   }
 
   String _formatTime(Timestamp? timestamp) {
@@ -254,6 +250,20 @@ class _StaffMainPageState extends State<StaffMainPage> {
 
   double _degreesToRadians(double degrees) {
     return degrees * pi / 180;
+  }
+
+  Future<String> _getStaffDetails(String staffId) async {
+    try {
+      final staffSnapshot = await FirebaseFirestore.instance.collection('staff').doc(staffId).get();
+      if (staffSnapshot.exists) {
+        final staffData = staffSnapshot.data() as Map<String, dynamic>;
+        return '${staffData['name']} (Code: ${staffData['staffNumber']}, Position: ${staffData['position']})';
+      }
+      return 'Unknown Staff';
+    } catch (e) {
+      print('Error fetching staff details: $e');
+      return 'Unknown Staff';
+    }
   }
 
   void _assignToEmergency(BuildContext context, DocumentSnapshot doc) async {
@@ -304,7 +314,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _formatTime(data['timestamp']),
+                    isAssigned || isCompleted ? _formatTimestamp(data['timestamp']) : _formatTime(data['timestamp']),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.black,
@@ -394,12 +404,66 @@ class _StaffMainPageState extends State<StaffMainPage> {
                   ),
                 ),
               if (isAssigned)
-                Text(
-                  'Assigned to: ${data['assignedToName'] ?? 'Unknown'}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black,
-                  ),
+                FutureBuilder<String>(
+                  future: _getStaffDetails(data['assignedTo']),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Text(
+                        'Loading...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                        ),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Text(
+                        'Assigned to: Unknown Staff',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                        ),
+                      );
+                    }
+                    return Text(
+                      'Assigned to: ${snapshot.data}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
+                    );
+                  },
+                ),
+              if (isCompleted)
+                FutureBuilder<String>(
+                  future: _getStaffDetails(data['assignedTo']),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Text(
+                        'Loading...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                        ),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Text(
+                        'Completed by: Unknown Staff',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                        ),
+                      );
+                    }
+                    return Text(
+                      'Completed by: ${snapshot.data}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
+                    );
+                  },
                 ),
             ],
           ),
@@ -462,13 +526,20 @@ class _StaffMainPageState extends State<StaffMainPage> {
               ),
               SizedBox(height: 10),
               Container(
-                height: 300.0, // Adjusted height for new emergencies
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: unresolvedDocs.map((doc) {
-                    return _buildEmergencyCard(doc, false, false);
-                  }).toList(),
-                ),
+                height: 250.0, // Adjusted height for new emergencies
+                child: unresolvedDocs.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No new emergencies',
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                      )
+                    : ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: unresolvedDocs.map((doc) {
+                          return _buildEmergencyCard(doc, false, false);
+                        }).toList(),
+                      ),
               ),
               SizedBox(height: 20),
               Text(
@@ -477,13 +548,20 @@ class _StaffMainPageState extends State<StaffMainPage> {
               ),
               SizedBox(height: 10),
               Container(
-                height: 300.0, // Adjusted height for in investigation
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: assignedDocs.map((doc) {
-                    return _buildEmergencyCard(doc, true, false);
-                  }).toList(),
-                ),
+                height: 240.0, // Adjusted height for in investigation
+                child: assignedDocs.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No emergencies in investigation',
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                      )
+                    : ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: assignedDocs.map((doc) {
+                          return _buildEmergencyCard(doc, true, false);
+                        }).toList(),
+                      ),
               ),
               SizedBox(height: 20),
               Text(
@@ -492,13 +570,20 @@ class _StaffMainPageState extends State<StaffMainPage> {
               ),
               SizedBox(height: 10),
               Container(
-                height: 220.0, // Adjusted height for completed
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: completedDocs.map((doc) {
-                    return _buildEmergencyCard(doc, false, true);
-                  }).toList(),
-                ),
+                height: 250.0, // Adjusted height for completed
+                child: completedDocs.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No completed emergencies',
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                      )
+                    : ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: completedDocs.map((doc) {
+                          return _buildEmergencyCard(doc, false, true);
+                        }).toList(),
+                      ),
               ),
             ],
           ),
