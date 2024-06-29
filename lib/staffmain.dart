@@ -32,6 +32,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
   List<DocumentSnapshot> assignedDocs = [];
   List<DocumentSnapshot> completedDocs = [];
   String _currentLocation = 'Fetching...';
+  loc.LocationData? _staffLocation;
 
   final List<Color> _redColors = [
     Colors.red.shade100,
@@ -57,59 +58,71 @@ class _StaffMainPageState extends State<StaffMainPage> {
     Colors.green.shade500,
   ];
 
+  final double _range = 10.0; // Range in kilometers
+
   @override
   void initState() {
     super.initState();
-    _subscription = FirebaseFirestore.instance
-        .collection('staff_emergency')
-        .snapshots()
-        .listen((snapshot) {
-      setState(() {
-        unresolvedDocs = snapshot.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>?;
-          if (data == null) return false;
-          return data['status'] == 'unresolved' && data['assignedTo'] == null;
-        }).toList();
+    _initializeLocationAndData();
+  }
 
-        assignedDocs = snapshot.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>?;
-          if (data == null) return false;
-          return data['status'] == 'assigned';
-        }).toList();
+  void _initializeLocationAndData() async {
+    try {
+      _staffLocation = await _getCurrentLocation();
+      _convertCoordinatesToAddress(_staffLocation!.latitude!, _staffLocation!.longitude!);
 
-        completedDocs = snapshot.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>?;
-          if (data == null) return false;
-          return data['status'] == 'resolved';
-        }).toList();
+      _subscription = FirebaseFirestore.instance
+          .collection('staff_emergency')
+          .snapshots()
+          .listen((snapshot) {
+        setState(() {
+          unresolvedDocs = snapshot.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>?;
+            if (data == null || data['location'] == null) return false;
+            final GeoPoint emergencyLocation = data['location'];
+            return _isWithinRange(emergencyLocation, _staffLocation!) && data['status'] == 'unresolved' && data['assignedTo'] == null;
+          }).toList();
 
-        unresolvedDocs.sort((a, b) {
-          Timestamp aTimestamp = a['timestamp'];
-          Timestamp bTimestamp = b['timestamp'];
-          return bTimestamp.compareTo(aTimestamp);
-        });
-        assignedDocs.sort((a, b) {
-          Timestamp aTimestamp = a['timestamp'];
-          Timestamp bTimestamp = b['timestamp'];
-          return bTimestamp.compareTo(aTimestamp);
-        });
-        completedDocs.sort((a, b) {
-          Timestamp aTimestamp = a['timestamp'];
-          Timestamp bTimestamp = b['timestamp'];
-          return bTimestamp.compareTo(aTimestamp);
+          assignedDocs = snapshot.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>?;
+            if (data == null || data['location'] == null) return false;
+            final GeoPoint emergencyLocation = data['location'];
+            return _isWithinRange(emergencyLocation, _staffLocation!) && data['status'] == 'assigned';
+          }).toList();
+
+          completedDocs = snapshot.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>?;
+            if (data == null || data['location'] == null) return false;
+            final GeoPoint emergencyLocation = data['location'];
+            return _isWithinRange(emergencyLocation, _staffLocation!) && data['status'] == 'completed';
+          }).toList();
+
+          unresolvedDocs.sort((a, b) {
+            Timestamp aTimestamp = a['timestamp'];
+            Timestamp bTimestamp = b['timestamp'];
+            return bTimestamp.compareTo(aTimestamp);
+          });
+          assignedDocs.sort((a, b) {
+            Timestamp aTimestamp = a['timestamp'];
+            Timestamp bTimestamp = b['timestamp'];
+            return bTimestamp.compareTo(aTimestamp);
+          });
+          completedDocs.sort((a, b) {
+            Timestamp aTimestamp = a['timestamp'];
+            Timestamp bTimestamp = b['timestamp'];
+            return bTimestamp.compareTo(aTimestamp);
+          });
+
+          if (unresolvedDocs.isNotEmpty && !_isVibrating) {
+            _startVibrating();
+          } else if (unresolvedDocs.isEmpty && _isVibrating) {
+            _stopVibrating();
+          }
         });
       });
-
-      if (unresolvedDocs.isNotEmpty && !_isVibrating) {
-        _startVibrating();
-      } else if (unresolvedDocs.isEmpty && _isVibrating) {
-        _stopVibrating();
-      }
-    });
-
-    _getCurrentLocation().then((location) {
-      _convertCoordinatesToAddress(location.latitude!, location.longitude!);
-    });
+    } catch (e) {
+      print('Error initializing location and data: $e');
+    }
   }
 
   @override
@@ -224,172 +237,175 @@ class _StaffMainPageState extends State<StaffMainPage> {
     return colorSet[random.nextInt(colorSet.length)];
   }
 
-  Widget _buildEmergencyList(List<DocumentSnapshot> docs, bool isAssigned, bool isCompleted) {
-    if (docs.isEmpty) {
-      return Center(
-        child: Text(
-          'No emergencies',
-          style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 15),
-        ),
-      );
-    }
+  bool _isWithinRange(GeoPoint emergencyLocation, loc.LocationData staffLocation) {
+    const double earthRadius = 6371.0; // Radius of the Earth in kilometers
+    double dLat = _degreesToRadians(emergencyLocation.latitude - staffLocation.latitude!);
+    double dLon = _degreesToRadians(emergencyLocation.longitude - staffLocation.longitude!);
 
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      shrinkWrap: true,
-      itemCount: docs.length,
-      itemBuilder: (context, index) {
-        final data = docs[index].data() as Map<String, dynamic>?;
-        if (data == null) return SizedBox.shrink();
+    double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_degreesToRadians(staffLocation.latitude!)) * cos(_degreesToRadians(emergencyLocation.latitude)) *
+        sin(dLon / 2) * sin(dLon / 2);
 
-        Color cardColor;
-        if (isAssigned) {
-          cardColor = _getRandomColor(_yellowOrangeColors);
-        } else if (isCompleted) {
-          cardColor = _getRandomColor(_greenColors);
-        } else {
-          cardColor = _getRandomColor(_redColors);
-        }
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    double distance = earthRadius * c;
 
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => StaffEmergencyViewPage(emergencyData: docs[index]),
-              ),
-            );
-          },
-          child: Container(
-            width: 250,  // Fixed width
-            height: 300,  // Adjusted height
-            margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(16.0),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _formatTime(data['timestamp']),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.black,
-                        ),
-                      ),
-                      if (!isCompleted)
-                        Icon(
-                          Icons.warning,
-                          color: Colors.red,
-                        ),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                  FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Text(
-                          'Loading...',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        );
-                      }
-                      if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-                        return Text(
-                          'Unknown User',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        );
-                      }
-                      final userData = snapshot.data!.data() as Map<String, dynamic>;
-                      return Text(
-                        userData['fullName'] ?? 'Unknown User',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      );
-                    },
-                  ),
-                  SizedBox(height: 4),
-                  FutureBuilder<String>(
-                    future: _convertGeoPointToAddress(data['location']),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Text(
-                          'Fetching location...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.black,
-                          ),
-                        );
-                      }
-                      if (snapshot.hasError) {
-                        return Text(
-                          'Unknown location',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.black,
-                          ),
-                        );
-                      }
-                      return Text(
-                        snapshot.data ?? 'Unknown location',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      );
-                    },
-                  ),
-                  SizedBox(height: 20),
-                  if (!isAssigned && !isCompleted)
-                    Center(
-                      child : ElevatedButton(
-                      onPressed: () => _assignToEmergency(context, docs[index]),
-                      child: Text('Assign to Emergency', style: TextStyle(color: Colors.black),),
-                    ),
-                    ),
-                  if (isAssigned)
-                    Text(
-                      'Assigned to: ${data['assignedToName'] ?? 'Unknown'}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    return distance <= _range;
   }
 
-  void _assignToEmergency(BuildContext context, DocumentSnapshot emergencyDoc) async {
-    await FirebaseFirestore.instance.collection('staff_emergency').doc(emergencyDoc.id).update({
+  double _degreesToRadians(double degrees) {
+    return degrees * pi / 180;
+  }
+
+  void _assignToEmergency(BuildContext context, DocumentSnapshot doc) async {
+    await FirebaseFirestore.instance.collection('staff_emergency').doc(doc.id).update({
       'assignedTo': widget.userId,
       'assignedToName': widget.fullName,
       'status': 'assigned',
     });
     setState(() {});
+  }
+
+  Widget _buildEmergencyCard(DocumentSnapshot doc, bool isAssigned, bool isCompleted) {
+    final data = doc.data() as Map<String, dynamic>?;
+    if (data == null) return SizedBox.shrink();
+
+    Color cardColor;
+    if (isAssigned) {
+      cardColor = _getRandomColor(_yellowOrangeColors);
+    } else if (isCompleted) {
+      cardColor = _getRandomColor(_greenColors);
+    } else {
+      cardColor = _getRandomColor(_redColors);
+    }
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => StaffEmergencyViewPage(emergencyData: doc),
+          ),
+        );
+      },
+      child: Container(
+        width: 250,  // Fixed width
+        height: 350,  // Adjusted height
+        margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _formatTime(data['timestamp']),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.black,
+                    ),
+                  ),
+                  if (!isCompleted)
+                    Icon(
+                      Icons.warning,
+                      color: Colors.red,
+                    ),
+                ],
+              ),
+              SizedBox(height: 8),
+              FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Text(
+                      'Loading...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    );
+                  }
+                  if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                    return Text(
+                      'Unknown User',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    );
+                  }
+                  final userData = snapshot.data!.data() as Map<String, dynamic>;
+                  return Text(
+                    userData['fullName'] ?? 'Unknown User',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  );
+                },
+              ),
+              SizedBox(height: 4),
+              FutureBuilder<String>(
+                future: _convertGeoPointToAddress(data['location']),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Text(
+                      'Fetching location...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return Text(
+                      'Unknown location',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
+                    );
+                  }
+                  return Text(
+                    snapshot.data ?? 'Unknown location',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  );
+                },
+              ),
+              SizedBox(height: 20),
+              if (!isAssigned && !isCompleted)
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () => _assignToEmergency(context, doc),
+                    child: Text('Assign to Emergency', style: TextStyle(color: Colors.black)),
+                  ),
+                ),
+              if (isAssigned)
+                Text(
+                  'Assigned to: ${data['assignedToName'] ?? 'Unknown'}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -446,8 +462,13 @@ class _StaffMainPageState extends State<StaffMainPage> {
               ),
               SizedBox(height: 10),
               Container(
-                height: 250.0,  // Adjusted height for new emergencies
-                child: _buildEmergencyList(unresolvedDocs, false, false),
+                height: 300.0, // Adjusted height for new emergencies
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: unresolvedDocs.map((doc) {
+                    return _buildEmergencyCard(doc, false, false);
+                  }).toList(),
+                ),
               ),
               SizedBox(height: 20),
               Text(
@@ -456,8 +477,13 @@ class _StaffMainPageState extends State<StaffMainPage> {
               ),
               SizedBox(height: 10),
               Container(
-                height: 240.0,  // Adjusted height for in investigation
-                child: _buildEmergencyList(assignedDocs, true, false),
+                height: 300.0, // Adjusted height for in investigation
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: assignedDocs.map((doc) {
+                    return _buildEmergencyCard(doc, true, false);
+                  }).toList(),
+                ),
               ),
               SizedBox(height: 20),
               Text(
@@ -466,16 +492,12 @@ class _StaffMainPageState extends State<StaffMainPage> {
               ),
               SizedBox(height: 10),
               Container(
-                height: 300.0,  // Adjusted height for completed
-                child: ListView.builder(
+                height: 220.0, // Adjusted height for completed
+                child: ListView(
                   scrollDirection: Axis.horizontal,
-                  itemCount: completedDocs.length,
-                  itemBuilder: (context, index) {
-                    return Container(
-                      width: 250,  // Fixed width
-                      child: _buildEmergencyList([completedDocs[index]], false, true),
-                    );
-                  },
+                  children: completedDocs.map((doc) {
+                    return _buildEmergencyCard(doc, false, true);
+                  }).toList(),
                 ),
               ),
             ],
