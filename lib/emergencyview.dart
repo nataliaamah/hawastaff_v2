@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class StaffEmergencyViewPage extends StatelessWidget {
   final DocumentSnapshot emergencyData;
@@ -20,7 +21,16 @@ class StaffEmergencyViewPage extends StatelessWidget {
 
   void _markAsResolved(BuildContext context) async {
     await FirebaseFirestore.instance.collection('staff_emergency').doc(emergencyData.id).update({
-      'resolved': true,
+      'status': 'completed',
+    });
+    Navigator.pop(context);
+  }
+
+  void _assignToEmergency(BuildContext context) async {
+    await FirebaseFirestore.instance.collection('staff_emergency').doc(emergencyData.id).update({
+      'status': 'assigned',
+      'assignedTo': FirebaseAuth.instance.currentUser!.uid,
+      'assignedToName': FirebaseAuth.instance.currentUser!.displayName,
     });
     Navigator.pop(context);
   }
@@ -50,6 +60,7 @@ class StaffEmergencyViewPage extends StatelessWidget {
     final GeoPoint location = data?['location'] ?? GeoPoint(0, 0);
     final double latitude = location.latitude;
     final double longitude = location.longitude;
+    final String assignedTo = data?['assignedTo'] ?? '';
 
     return Scaffold(
       backgroundColor: const Color.fromRGBO(2, 1, 34, 1),
@@ -70,10 +81,11 @@ class StaffEmergencyViewPage extends StatelessWidget {
           },
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.check, color: Colors.white),
-            onPressed: () => _markAsResolved(context),
-          ),
+          if (assignedTo == FirebaseAuth.instance.currentUser!.uid)
+            IconButton(
+              icon: Icon(Icons.check, color: Colors.white),
+              onPressed: () => _markAsResolved(context),
+            ),
         ],
       ),
       body: userId.isEmpty
@@ -162,6 +174,27 @@ class StaffEmergencyViewPage extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (assignedTo.isEmpty) ...[
+                          SizedBox(height: 20),
+                          Center(
+                          child: ElevatedButton(
+                            onPressed: () => _assignToEmergency(context),
+                            child: Text('Assign to Emergency'),
+                          ),
+                          ),
+                        ] else ...[
+                          SizedBox(height: 20),
+                          Center(
+                          child : Text(
+                            'Assigned to: ${data?['assignedToName'] ?? 'Unknown'}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

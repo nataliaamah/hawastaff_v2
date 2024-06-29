@@ -1,12 +1,13 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
 import 'package:intl/intl.dart';
-import 'package:location/location.dart' as loc; // Use 'loc' as a prefix for the location package
-import 'package:geocoding/geocoding.dart'; // Import geocoding package
-import 'emergencyview.dart'; // Import the view page
+import 'package:location/location.dart' as loc;
+import 'package:geocoding/geocoding.dart';
+import 'emergencyview.dart';
 
 class StaffMainPage extends StatefulWidget {
   final String userId;
@@ -27,8 +28,34 @@ class _StaffMainPageState extends State<StaffMainPage> {
   bool _isVibrating = false;
   late StreamSubscription _subscription;
   Timer? _vibrationTimer;
-  List<DocumentSnapshot> emergencyDocs = [];
-  String _currentLocation = 'Fetching...'; // Placeholder for the current location
+  List<DocumentSnapshot> unresolvedDocs = [];
+  List<DocumentSnapshot> assignedDocs = [];
+  List<DocumentSnapshot> completedDocs = [];
+  String _currentLocation = 'Fetching...';
+
+  final List<Color> _redColors = [
+    Colors.red.shade100,
+    Colors.red.shade200,
+    Colors.red.shade300,
+    Colors.red.shade400,
+    Colors.red.shade500,
+  ];
+
+  final List<Color> _yellowOrangeColors = [
+    Colors.orange.shade100,
+    Colors.orange.shade200,
+    Colors.orange.shade300,
+    Colors.orange.shade400,
+    Colors.orange.shade500,
+  ];
+
+  final List<Color> _greenColors = [
+    Colors.green.shade100,
+    Colors.green.shade200,
+    Colors.green.shade300,
+    Colors.green.shade400,
+    Colors.green.shade500,
+  ];
 
   @override
   void initState() {
@@ -38,26 +65,48 @@ class _StaffMainPageState extends State<StaffMainPage> {
         .snapshots()
         .listen((snapshot) {
       setState(() {
-        emergencyDocs = snapshot.docs.where((doc) {
+        unresolvedDocs = snapshot.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>?;
           if (data == null) return false;
-          return data['resolved'] == false;
+          return data['status'] == 'unresolved' && data['assignedTo'] == null;
         }).toList();
-        emergencyDocs.sort((a, b) {
+
+        assignedDocs = snapshot.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null) return false;
+          return data['status'] == 'assigned';
+        }).toList();
+
+        completedDocs = snapshot.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null) return false;
+          return data['status'] == 'resolved';
+        }).toList();
+
+        unresolvedDocs.sort((a, b) {
+          Timestamp aTimestamp = a['timestamp'];
+          Timestamp bTimestamp = b['timestamp'];
+          return bTimestamp.compareTo(aTimestamp);
+        });
+        assignedDocs.sort((a, b) {
+          Timestamp aTimestamp = a['timestamp'];
+          Timestamp bTimestamp = b['timestamp'];
+          return bTimestamp.compareTo(aTimestamp);
+        });
+        completedDocs.sort((a, b) {
           Timestamp aTimestamp = a['timestamp'];
           Timestamp bTimestamp = b['timestamp'];
           return bTimestamp.compareTo(aTimestamp);
         });
       });
 
-      if (emergencyDocs.isNotEmpty && !_isVibrating) {
+      if (unresolvedDocs.isNotEmpty && !_isVibrating) {
         _startVibrating();
-      } else if (emergencyDocs.isEmpty && _isVibrating) {
+      } else if (unresolvedDocs.isEmpty && _isVibrating) {
         _stopVibrating();
       }
     });
 
-    // Fetch the current location
     _getCurrentLocation().then((location) {
       _convertCoordinatesToAddress(location.latitude!, location.longitude!);
     });
@@ -112,6 +161,17 @@ class _StaffMainPageState extends State<StaffMainPage> {
     }
   }
 
+  Future<String> _convertGeoPointToAddress(GeoPoint geoPoint) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(geoPoint.latitude, geoPoint.longitude);
+      Placemark place = placemarks[0];
+      return '${place.street}, ${place.locality}, ${place.country}';
+    } catch (e) {
+      print('Error occurred while converting geopoint to address: $e');
+      return 'Unknown location';
+    }
+  }
+
   void _startVibrating() {
     _isVibrating = true;
     _vibrate();
@@ -159,22 +219,37 @@ class _StaffMainPageState extends State<StaffMainPage> {
     return DateFormat('h:mm a').format(date);
   }
 
-  Widget _buildEmergencyList(List<DocumentSnapshot> docs) {
+  Color _getRandomColor(List<Color> colorSet) {
+    final random = Random();
+    return colorSet[random.nextInt(colorSet.length)];
+  }
+
+  Widget _buildEmergencyList(List<DocumentSnapshot> docs, bool isAssigned, bool isCompleted) {
     if (docs.isEmpty) {
       return Center(
         child: Text(
-          'No new emergencies',
-          style: TextStyle(color: Colors.black, fontSize: 15),
+          'No emergencies',
+          style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 15),
         ),
       );
     }
 
     return ListView.builder(
+      scrollDirection: Axis.horizontal,
       shrinkWrap: true,
       itemCount: docs.length,
       itemBuilder: (context, index) {
         final data = docs[index].data() as Map<String, dynamic>?;
         if (data == null) return SizedBox.shrink();
+
+        Color cardColor;
+        if (isAssigned) {
+          cardColor = _getRandomColor(_yellowOrangeColors);
+        } else if (isCompleted) {
+          cardColor = _getRandomColor(_greenColors);
+        } else {
+          cardColor = _getRandomColor(_redColors);
+        }
 
         return GestureDetector(
           onTap: () {
@@ -186,17 +261,12 @@ class _StaffMainPageState extends State<StaffMainPage> {
             );
           },
           child: Container(
+            width: 250,  // Fixed width
+            height: 300,  // Adjusted height
             margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(16.0),
-              boxShadow: [
-                BoxShadow(
-                  color: Color.fromRGBO(248, 51, 60, 0.6),
-                  spreadRadius: 10,
-                  blurRadius: 10,
-                ),
-              ],
             ),
             child: Padding(
               padding: const EdgeInsets.all(12.0),
@@ -213,10 +283,11 @@ class _StaffMainPageState extends State<StaffMainPage> {
                           color: Colors.black,
                         ),
                       ),
-                      Icon(
-                        Icons.warning,
-                        color: Colors.red,
-                      ),
+                      if (!isCompleted)
+                        Icon(
+                          Icons.warning,
+                          color: Colors.red,
+                        ),
                     ],
                   ),
                   SizedBox(height: 8),
@@ -255,14 +326,54 @@ class _StaffMainPageState extends State<StaffMainPage> {
                     },
                   ),
                   SizedBox(height: 4),
-                  Text(
-                    'Emergency',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
+                  FutureBuilder<String>(
+                    future: _convertGeoPointToAddress(data['location']),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Text(
+                          'Fetching location...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black,
+                          ),
+                        );
+                      }
+                      if (snapshot.hasError) {
+                        return Text(
+                          'Unknown location',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black,
+                          ),
+                        );
+                      }
+                      return Text(
+                        snapshot.data ?? 'Unknown location',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      );
+                    },
                   ),
-                  SizedBox(height: 10),
+                  SizedBox(height: 20),
+                  if (!isAssigned && !isCompleted)
+                    Center(
+                      child : ElevatedButton(
+                      onPressed: () => _assignToEmergency(context, docs[index]),
+                      child: Text('Assign to Emergency', style: TextStyle(color: Colors.black),),
+                    ),
+                    ),
+                  if (isAssigned)
+                    Text(
+                      'Assigned to: ${data['assignedToName'] ?? 'Unknown'}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -270,6 +381,15 @@ class _StaffMainPageState extends State<StaffMainPage> {
         );
       },
     );
+  }
+
+  void _assignToEmergency(BuildContext context, DocumentSnapshot emergencyDoc) async {
+    await FirebaseFirestore.instance.collection('staff_emergency').doc(emergencyDoc.id).update({
+      'assignedTo': widget.userId,
+      'assignedToName': widget.fullName,
+      'status': 'assigned',
+    });
+    setState(() {});
   }
 
   @override
@@ -287,44 +407,79 @@ class _StaffMainPageState extends State<StaffMainPage> {
           width: 200,
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.location_pin, color: Colors.red),
-                Text(
-                  _currentLocation, // Placeholder for user location
-                  style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  widget.fullName, // Placeholder for user name
-                  style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Emergency Alerts',
-              style: GoogleFonts.quicksand(
-                textStyle: TextStyle(fontSize: 27, color: const Color.fromARGB(255, 255, 255, 255), fontWeight: FontWeight.bold),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.location_pin, color: Colors.red),
+                  SizedBox(width: 4),
+                  Text(
+                    _currentLocation,
+                    style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'New Emergencies',
-              style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Expanded(child: _buildEmergencyList(emergencyDocs)),
-          ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    widget.fullName,
+                    style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Emergency Alerts',
+                style: GoogleFonts.quicksand(
+                  textStyle: TextStyle(fontSize: 27, color: const Color.fromARGB(255, 255, 255, 255), fontWeight: FontWeight.bold),
+                ),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'New Emergencies',
+                style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 10),
+              Container(
+                height: 250.0,  // Adjusted height for new emergencies
+                child: _buildEmergencyList(unresolvedDocs, false, false),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'In Investigation',
+                style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 10),
+              Container(
+                height: 240.0,  // Adjusted height for in investigation
+                child: _buildEmergencyList(assignedDocs, true, false),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Completed',
+                style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 10),
+              Container(
+                height: 300.0,  // Adjusted height for completed
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: completedDocs.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      width: 250,  // Fixed width
+                      child: _buildEmergencyList([completedDocs[index]], false, true),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
