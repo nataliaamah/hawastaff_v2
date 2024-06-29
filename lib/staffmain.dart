@@ -478,131 +478,194 @@ class _StaffMainPageState extends State<StaffMainPage> {
           height: 200,
           width: 200,
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.search),
+            onPressed: () {
+              // Search functionality here
+            },
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.location_pin, color: Colors.red),
-                  SizedBox(width: 4),
-                  Text(
-                    _currentLocation,
-                    style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16, fontWeight: FontWeight.bold),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.location_pin, color: Colors.red),
+                    SizedBox(width: 5),
+                    Text(
+                      _currentLocation,
+                      style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 5,),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(Icons.person, color: Colors.orange,),
+                    SizedBox(width: 5),
+                    Text(
+                      widget.fullName,
+                      style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                Text(
+                  'Emergency Alerts',
+                  style: GoogleFonts.quicksand(
+                    textStyle: TextStyle(fontSize: 27, color: const Color.fromRGBO(226, 192, 68, 1), fontWeight: FontWeight.bold),
                   ),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.fullName,
-                    style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 20),
+              ],
+            ),
+          ),
+          Expanded(
+            child: CustomPaint(
+              painter: PersonalInfoPainter(),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.only(left: 10),
+                        child: Text(
+                        'New Emergencies',
+                        style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      ),
+                      SizedBox(height: 10),
+                      Container(
+                        height: 250.0, // Adjusted height for new emergencies
+                        child: unresolvedDocs.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No new emergencies',
+                                  style: TextStyle(color: const Color.fromARGB(255, 167, 167, 167), fontSize: 15),
+                                ),
+                              )
+                            : ListView(
+                                scrollDirection: Axis.horizontal,
+                                children: unresolvedDocs.map((doc) {
+                                  return _buildEmergencyCard(doc, false, false);
+                                }).toList(),
+                              ),
+                      ),
+                      Divider(height: 10,thickness: 0.5,color: const Color.fromARGB(255, 167, 167, 167), indent: 30, endIndent: 30,),
+                      SizedBox(height: 20),
+                      Padding(
+                        padding : EdgeInsets.only(left: 10),
+                        child : Text(
+                        'In Investigation',
+                        style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      ),
+                      SizedBox(height: 10),
+                      Container(
+                        height: 240.0, // Adjusted height for in investigation
+                        child: assignedDocs.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No emergencies in investigation',
+                                  style: TextStyle(color: const Color.fromARGB(255, 167, 167, 167), fontSize: 15),
+                                ),
+                              )
+                            : ListView(
+                                scrollDirection: Axis.horizontal,
+                                children: assignedDocs.map((doc) {
+                                  return _buildEmergencyCard(doc, true, false);
+                                }).toList(),
+                              ),
+                      ),
+                      Divider(height: 10,thickness: 0.5,color: const Color.fromARGB(255, 167, 167, 167), indent: 30, endIndent: 30,),
+                      SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.only(left: 10),
+                            child : Text(
+                            'Completed',
+                            style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ViewCompletedPage(
+                                    userId: widget.userId,
+                                    fullName: widget.fullName,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              'See More',
+                              style: TextStyle(color: Color.fromRGBO(226, 192, 68, 1), fontSize: 14, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      Container(
+                        height: 250.0, // Adjusted height for completed
+                        child: completedDocs.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No completed emergencies',
+                                  style: TextStyle(color: Colors.white, fontSize: 18),
+                                ),
+                              )
+                            : ListView(
+                                scrollDirection: Axis.horizontal,
+                                children: completedDocs.take(5).map((doc) {
+                                  return _buildEmergencyCard(doc, false, true);
+                                }).toList(),
+                              ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              SizedBox(height: 20),
-              Text(
-                'Emergency Alerts',
-                style: GoogleFonts.quicksand(
-                  textStyle: TextStyle(fontSize: 27, color: const Color.fromRGBO(226, 192, 68, 1), fontWeight: FontWeight.bold),
                 ),
               ),
-              SizedBox(height: 20),
-              Text(
-                'New Emergencies',
-                style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 10),
-              Container(
-                height: 250.0, // Adjusted height for new emergencies
-                child: unresolvedDocs.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No new emergencies',
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                        ),
-                      )
-                    : ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: unresolvedDocs.map((doc) {
-                          return _buildEmergencyCard(doc, false, false);
-                        }).toList(),
-                      ),
-              ),
-              SizedBox(height: 20),
-              Text(
-                'In Investigation',
-                style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 10),
-              Container(
-                height: 240.0, // Adjusted height for in investigation
-                child: assignedDocs.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No emergencies in investigation',
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                        ),
-                      )
-                    : ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: assignedDocs.map((doc) {
-                          return _buildEmergencyCard(doc, true, false);
-                        }).toList(),
-                      ),
-              ),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Completed',
-                    style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ViewCompletedPage(
-                            userId: widget.userId,
-                            fullName: widget.fullName,
-                          ),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      'See More',
-                      style: TextStyle(color: Color.fromRGBO(226, 192, 68, 1), fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 10),
-              Container(
-                height: 250.0, // Adjusted height for completed
-                child: completedDocs.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No completed emergencies',
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                        ),
-                      )
-                    : ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: completedDocs.take(5).map((doc) {
-                          return _buildEmergencyCard(doc, false, true);
-                        }).toList(),
-                      ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
+  }
+}
+
+class PersonalInfoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.grey.shade800
+      ..style = PaintingStyle.fill;
+
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final radius = Radius.circular(40);
+    final rrect = RRect.fromRectAndCorners(
+      rect,
+      topLeft: radius,
+      topRight: radius,
+    );
+
+    canvas.drawRRect(rrect, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return false;
   }
 }

@@ -99,7 +99,9 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
         }
       }();
 
-      final matchesSearch = _searchQuery.isEmpty || data['address'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
+      final address = data['location']?.toString().toLowerCase().trim() ?? '';
+      final searchQuery = _searchQuery.toLowerCase().trim();
+      final matchesSearch = _searchQuery.isEmpty || address.contains(searchQuery);
 
       return matchesDate && matchesSearch;
     }).toList();
@@ -165,7 +167,7 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(context).pop('');
               },
               child: Text('Cancel'),
             ),
@@ -196,8 +198,8 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
         );
       },
       child: Container(
-        width: 320,  // Longer width for title card
-        height: 200,  // Custom height for list card
+        width: 320, // Longer width for title card
+        height: widget.listHeight, // Custom height for list card
         margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
         decoration: BoxDecoration(
           color: Colors.green.shade100,
