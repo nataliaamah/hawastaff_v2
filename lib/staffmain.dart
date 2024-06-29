@@ -277,130 +277,89 @@ class _StaffMainPageState extends State<StaffMainPage> {
   }
 
   Widget _buildEmergencyCard(DocumentSnapshot doc, bool isAssigned, bool isCompleted) {
-  final data = doc.data() as Map<String, dynamic>?;
-  if (data == null) return SizedBox.shrink();
+    final data = doc.data() as Map<String, dynamic>?;
+    if (data == null) return SizedBox.shrink();
 
-  return GestureDetector(
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => StaffEmergencyViewPage(emergencyData: doc),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => StaffEmergencyViewPage(emergencyData: doc),
+          ),
+        );
+      },
+      child: Container(
+        width: 250,  // Fixed width
+        height: 350,  // Adjusted height
+        margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+        decoration: BoxDecoration(
+          color: Colors.green.shade100,
+          borderRadius: BorderRadius.circular(16.0),
         ),
-      );
-    },
-    child: Container(
-      width: 250,  // Fixed width
-      height: 350,  // Adjusted height
-      margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
-      decoration: BoxDecoration(
-        color: Colors.green.shade100,
-        borderRadius: BorderRadius.circular(16.0),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _formatTimestamp(data['timestamp']),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.black,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _formatTimestamp(data['timestamp']),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
-                Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            FutureBuilder<DocumentSnapshot>(
-              future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Text(
-                    'Loading...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  );
-                }
-                if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-                  return Text(
-                    'Unknown User',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  );
-                }
-                final userData = snapshot.data!.data() as Map<String, dynamic>;
-                return Text(
-                  userData['fullName'] ?? 'Unknown User',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                  Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
                   ),
-                );
-              },
-            ),
-            SizedBox(height: 4),
-            FutureBuilder<String>(
-              future: _convertGeoPointToAddress(data['location']),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Text(
-                    'Fetching location...',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
-                  );
-                }
-                if (snapshot.hasError) {
-                  return Text(
-                    'Unknown location',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
-                  );
-                }
-                return Text(
-                  snapshot.data ?? 'Unknown location',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                );
-              },
-            ),
-            SizedBox(height: 20),
-            if (!isAssigned && !isCompleted)
-              Center(
-                child: ElevatedButton(
-                  onPressed: () => _assignToEmergency(context, doc),
-                  child: Text('Assign to Emergency', style: TextStyle(color: Colors.black)),
-                ),
+                ],
               ),
-            if (isAssigned)
-              FutureBuilder<String>(
-                future: _getStaffDetails(data['assignedTo']),
+              SizedBox(height: 8),
+              FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Text(
                       'Loading...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    );
+                  }
+                  if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                    return Text(
+                      'Unknown User',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    );
+                  }
+                  final userData = snapshot.data!.data() as Map<String, dynamic>;
+                  return Text(
+                    userData['fullName'] ?? 'Unknown User',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  );
+                },
+              ),
+              SizedBox(height: 4),
+              FutureBuilder<String>(
+                future: _convertGeoPointToAddress(data['location']),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Text(
+                      'Fetching location...',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
@@ -409,7 +368,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                   }
                   if (snapshot.hasError) {
                     return Text(
-                      'Assigned to: Unknown Staff',
+                      'Unknown location',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
@@ -417,52 +376,104 @@ class _StaffMainPageState extends State<StaffMainPage> {
                     );
                   }
                   return Text(
-                    'Assigned to: ${snapshot.data}',
+                    snapshot.data ?? 'Unknown location',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.black,
                     ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                   );
                 },
               ),
-            if (isCompleted)
-              FutureBuilder<String>(
-                future: data['completedBy'] != null ? _getStaffDetails(data['completedBy']) : Future.value('Unknown Staff'),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+              SizedBox(height: 20),
+              if (!isAssigned && !isCompleted)
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () => _assignToEmergency(context, doc),
+                    child: Text('Assign to Emergency', style: TextStyle(color: Colors.black)),
+                  ),
+                ),
+              if (isAssigned)
+                FutureBuilder<String>(
+                  future: _getStaffDetails(data['assignedTo']),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Text(
+                        'Loading...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                        ),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Text(
+                        'Assigned to: Unknown Staff',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                        ),
+                      );
+                    }
                     return Text(
-                      'Loading...',
+                      'Assigned to: ${snapshot.data}',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
                       ),
                     );
-                  }
-                  if (snapshot.hasError) {
-                    return Text(
-                      'Completed by: Unknown Staff',
+                  },
+                ),
+              if (isCompleted)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FutureBuilder<String>(
+                      future: data['completedBy'] != null ? _getStaffDetails(data['completedBy']) : Future.value('Unknown Staff'),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Text(
+                            'Loading...',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.black,
+                            ),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Text(
+                            'Completed by: Unknown Staff',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.black,
+                            ),
+                          );
+                        }
+                        return Text(
+                          'Completed by: ${snapshot.data}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black,
+                          ),
+                        );
+                      },
+                    ),
+                    Text(
+                      'Completed On: ${_formatTimestamp(data['completedOn'])}',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
                       ),
-                    );
-                  }
-                  return Text(
-                    'Completed by: ${snapshot.data}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
                     ),
-                  );
-                },
-              ),
-          ],
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -540,7 +551,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                         padding: EdgeInsets.only(left: 10),
                         child: Text(
                         'New Emergencies',
-                        style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       ),
                       SizedBox(height: 10),
@@ -550,7 +561,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                             ? Center(
                                 child: Text(
                                   'No new emergencies',
-                                  style: TextStyle(color: const Color.fromARGB(255, 167, 167, 167), fontSize: 15),
+                                  style: TextStyle(color: const Color.fromARGB(255, 91, 91, 91), fontSize: 15),
                                 ),
                               )
                             : ListView(
@@ -560,13 +571,13 @@ class _StaffMainPageState extends State<StaffMainPage> {
                                 }).toList(),
                               ),
                       ),
-                      Divider(height: 10,thickness: 0.5,color: const Color.fromARGB(255, 167, 167, 167), indent: 30, endIndent: 30,),
+                      Divider(height: 10,thickness: 0.5,color: const Color.fromARGB(255, 91, 91, 91), indent: 30, endIndent: 30,),
                       SizedBox(height: 20),
                       Padding(
                         padding : EdgeInsets.only(left: 10),
                         child : Text(
                         'In Investigation',
-                        style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       ),
                       SizedBox(height: 10),
@@ -576,7 +587,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                             ? Center(
                                 child: Text(
                                   'No emergencies in investigation',
-                                  style: TextStyle(color: const Color.fromARGB(255, 167, 167, 167), fontSize: 15),
+                                  style: TextStyle(color: Color.fromARGB(255, 91, 91, 91), fontSize: 15),
                                 ),
                               )
                             : ListView(
@@ -586,7 +597,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                                 }).toList(),
                               ),
                       ),
-                      Divider(height: 10,thickness: 0.5,color: const Color.fromARGB(255, 167, 167, 167), indent: 30, endIndent: 30,),
+                      Divider(height: 10,thickness: 0.5,color: const Color.fromARGB(255, 91, 91, 91), indent: 30, endIndent: 30,),
                       SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -595,7 +606,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                             padding: EdgeInsets.only(left: 10),
                             child : Text(
                             'Completed',
-                            style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           ),
                           GestureDetector(
@@ -612,7 +623,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                             },
                             child: Text(
                               'See More',
-                              style: TextStyle(color: Color.fromRGBO(226, 192, 68, 1), fontSize: 14, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 14, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
@@ -650,7 +661,7 @@ class PersonalInfoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey.shade800
+      ..color = Color.fromRGBO(197, 197, 197, 1)
       ..style = PaintingStyle.fill;
 
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);

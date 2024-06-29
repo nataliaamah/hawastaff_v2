@@ -210,20 +210,22 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _formatDate(data['timestamp']),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.black,
+              if (_isTileView) ...[
+                Text(
+                  _formatDate(data['timestamp']),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
-              Text(
-                _formatTime(data['timestamp']),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.black,
+                Text(
+                  _formatTime(data['timestamp']),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
+              ],
               SizedBox(height: 8),
               FutureBuilder<DocumentSnapshot>(
                 future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
@@ -311,16 +313,29 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
+                        fontWeight: FontWeight.w600,
                       ),
                     );
                   }
-                  return Text(
-                    'Completed by: ${snapshot.data}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
-                  );
+                  if (_isTileView) {
+                    return Text(
+                      'Completed by: ${snapshot.data}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  } else {
+                    return Text(
+                      'Completed: ${_formatTime(data['completedAt'])} ${_formatDate(data['completedAt'])} by ${snapshot.data}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  }
                 },
               ),
             ],
@@ -471,7 +486,7 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
             child: _isTileView
                 ? GridView.builder(
                     padding: EdgeInsets.all(8.0),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.65),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.65, ),
                     itemCount: filteredDocs.length,
                     itemBuilder: (context, index) {
                       return _buildEmergencyCard(filteredDocs[index]);

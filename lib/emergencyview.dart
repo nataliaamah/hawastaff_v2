@@ -1,14 +1,24 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 
-class StaffEmergencyViewPage extends StatelessWidget {
+class StaffEmergencyViewPage extends StatefulWidget {
   final DocumentSnapshot emergencyData;
 
   StaffEmergencyViewPage({required this.emergencyData});
+
+  @override
+  _StaffEmergencyViewPageState createState() => _StaffEmergencyViewPageState();
+}
+
+class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
+  bool _isMapLoading = true;
 
   void _openInGoogleMaps(double latitude, double longitude) async {
     final googleMapsUrl = 'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude';
@@ -20,14 +30,17 @@ class StaffEmergencyViewPage extends StatelessWidget {
   }
 
   void _markAsResolved(BuildContext context) async {
-    await FirebaseFirestore.instance.collection('staff_emergency').doc(emergencyData.id).update({
+    await FirebaseFirestore.instance.collection('staff_emergency').doc(widget.emergencyData.id).update({
       'status': 'completed',
+      'completedBy': FirebaseAuth.instance.currentUser!.uid,
+      'completedByName': FirebaseAuth.instance.currentUser!.displayName,
+      'completedAt': Timestamp.now(),
     });
     Navigator.pop(context);
   }
 
   void _assignToEmergency(BuildContext context) async {
-    await FirebaseFirestore.instance.collection('staff_emergency').doc(emergencyData.id).update({
+    await FirebaseFirestore.instance.collection('staff_emergency').doc(widget.emergencyData.id).update({
       'status': 'assigned',
       'assignedTo': FirebaseAuth.instance.currentUser!.uid,
       'assignedToName': FirebaseAuth.instance.currentUser!.displayName,
@@ -38,6 +51,18 @@ class StaffEmergencyViewPage extends StatelessWidget {
   Future<Map<String, dynamic>> _fetchUserDetails(String userId) async {
     DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
     return userDoc.exists ? userDoc.data() as Map<String, dynamic> : {};
+  }
+
+  Future<String> _fetchAddress(double latitude, double longitude) async {
+    final googleMapsUrl = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=$latitude,$longitude&key=YOUR_GOOGLE_MAPS_API_KEY';
+    final response = await http.get(Uri.parse(googleMapsUrl));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['results'].isNotEmpty) {
+        return data['results'][0]['formatted_address'];
+      }
+    }
+    return 'Unknown location';
   }
 
   int _calculateAge(String dateOfBirth) {
@@ -55,7 +80,7 @@ class StaffEmergencyViewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Map<String, dynamic>? data = emergencyData.data() as Map<String, dynamic>?;
+    final Map<String, dynamic>? data = widget.emergencyData.data() as Map<String, dynamic>?;
     final String userId = data?['userId'] ?? ''; // Ensure userId field exists
     final GeoPoint location = data?['location'] ?? GeoPoint(0, 0);
     final double latitude = location.latitude;
@@ -159,40 +184,84 @@ class StaffEmergencyViewPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16.0),
                           child: Container(
                             height: 200,
-                            child: GoogleMap(
-                              initialCameraPosition: CameraPosition(
-                                target: LatLng(latitude, longitude),
-                                zoom: 14.0,
-                              ),
-                              markers: {
-                                Marker(
-                                  markerId: MarkerId('emergencyLocation'),
-                                  position: LatLng(latitude, longitude),
+                            child: Stack(
+                              children: [
+                                GoogleMap(
+                                  initialCameraPosition: CameraPosition(
+                                    target: LatLng(latitude, longitude),
+                                    zoom: 14.0,
+                                  ),
+                                  markers: {
+                                    Marker(
+                                      markerId: MarkerId('emergencyLocation'),
+                                      position: LatLng(latitude, longitude),
+                                    ),
+                                  },
+                                  onMapCreated: (GoogleMapController controller) {
+                                    setState(() {
+                                      _isMapLoading = false;
+                                    });
+                                  },
+                                  onTap: (_) => _openInGoogleMaps(latitude, longitude),
                                 ),
-                              },
-                              onTap: (_) => _openInGoogleMaps(latitude, longitude),
+                                if (_isMapLoading)
+                                  Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                              ],
                             ),
                           ),
+                        ),
+                        SizedBox(height: 10),
+                        FutureBuilder<String>(
+                          future: _fetchAddress(latitude, longitude),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return Text(
+                                'Fetching address...',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              );
+                            }
+                            if (snapshot.hasError) {
+                              return Text(
+                                'Unknown location',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              );
+                            }
+                            return Text(
+                              snapshot.data ?? 'Unknown location',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            );
+                          },
                         ),
                         if (assignedTo.isEmpty) ...[
                           SizedBox(height: 20),
                           Center(
-                          child: ElevatedButton(
-                            onPressed: () => _assignToEmergency(context),
-                            child: Text('Assign to Emergency'),
-                          ),
+                            child: ElevatedButton(
+                              onPressed: () => _assignToEmergency(context),
+                              child: Text('Assign to Emergency'),
+                            ),
                           ),
                         ] else ...[
                           SizedBox(height: 20),
                           Center(
-                          child : Text(
-                            'Assigned to: ${data?['assignedToName'] ?? 'Unknown'}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                            child: Text(
+                              'Assigned to: ${data?['assignedToName'] ?? 'Unknown'}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
                           ),
                         ],
                       ],
