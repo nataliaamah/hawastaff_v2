@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:location/location.dart' as loc;
 import 'package:geocoding/geocoding.dart';
 import 'emergencyview.dart';
+import 'viewcompleted.dart';
 
 class StaffMainPage extends StatefulWidget {
   final String userId;
@@ -164,7 +165,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
       List<Placemark> placemarks = await placemarkFromCoordinates(latitude, longitude);
       Placemark place = placemarks[0];
       setState(() {
-        _currentLocation = '${place.subLocality}, ${place.locality}';
+        _currentLocation = '${place.street},\n${place.locality}';
       });
     } catch (e) {
       print('Error occurred while converting coordinates to address: $e');
@@ -276,99 +277,130 @@ class _StaffMainPageState extends State<StaffMainPage> {
   }
 
   Widget _buildEmergencyCard(DocumentSnapshot doc, bool isAssigned, bool isCompleted) {
-    final data = doc.data() as Map<String, dynamic>?;
-    if (data == null) return SizedBox.shrink();
+  final data = doc.data() as Map<String, dynamic>?;
+  if (data == null) return SizedBox.shrink();
 
-    Color cardColor;
-    if (isAssigned) {
-      cardColor = _getRandomColor(_yellowOrangeColors);
-    } else if (isCompleted) {
-      cardColor = _getRandomColor(_greenColors);
-    } else {
-      cardColor = _getRandomColor(_redColors);
-    }
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => StaffEmergencyViewPage(emergencyData: doc),
-          ),
-        );
-      },
-      child: Container(
-        width: 250,  // Fixed width
-        height: 350,  // Adjusted height
-        margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(16.0),
+  return GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => StaffEmergencyViewPage(emergencyData: doc),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    isAssigned || isCompleted ? _formatTimestamp(data['timestamp']) : _formatTime(data['timestamp']),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.black,
-                    ),
+      );
+    },
+    child: Container(
+      width: 250,  // Fixed width
+      height: 350,  // Adjusted height
+      margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+      decoration: BoxDecoration(
+        color: Colors.green.shade100,
+        borderRadius: BorderRadius.circular(16.0),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formatTimestamp(data['timestamp']),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black,
                   ),
-                  if (!isCompleted)
-                    Icon(
-                      Icons.warning,
-                      color: Colors.red,
-                    ),
-                ],
-              ),
-              SizedBox(height: 8),
-              FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Text(
-                      'Loading...',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    );
-                  }
-                  if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-                    return Text(
-                      'Unknown User',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    );
-                  }
-                  final userData = snapshot.data!.data() as Map<String, dynamic>;
+                ),
+                Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            FutureBuilder<DocumentSnapshot>(
+              future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return Text(
-                    userData['fullName'] ?? 'Unknown User',
+                    'Loading...',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
                     ),
                   );
-                },
+                }
+                if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                  return Text(
+                    'Unknown User',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  );
+                }
+                final userData = snapshot.data!.data() as Map<String, dynamic>;
+                return Text(
+                  userData['fullName'] ?? 'Unknown User',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                );
+              },
+            ),
+            SizedBox(height: 4),
+            FutureBuilder<String>(
+              future: _convertGeoPointToAddress(data['location']),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Text(
+                    'Fetching location...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black,
+                    ),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Text(
+                    'Unknown location',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black,
+                    ),
+                  );
+                }
+                return Text(
+                  snapshot.data ?? 'Unknown location',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                );
+              },
+            ),
+            SizedBox(height: 20),
+            if (!isAssigned && !isCompleted)
+              Center(
+                child: ElevatedButton(
+                  onPressed: () => _assignToEmergency(context, doc),
+                  child: Text('Assign to Emergency', style: TextStyle(color: Colors.black)),
+                ),
               ),
-              SizedBox(height: 4),
+            if (isAssigned)
               FutureBuilder<String>(
-                future: _convertGeoPointToAddress(data['location']),
+                future: _getStaffDetails(data['assignedTo']),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Text(
-                      'Fetching location...',
+                      'Loading...',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
@@ -377,7 +409,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                   }
                   if (snapshot.hasError) {
                     return Text(
-                      'Unknown location',
+                      'Assigned to: Unknown Staff',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
@@ -385,92 +417,52 @@ class _StaffMainPageState extends State<StaffMainPage> {
                     );
                   }
                   return Text(
-                    snapshot.data ?? 'Unknown location',
+                    'Assigned to: ${snapshot.data}',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.black,
                     ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
                   );
                 },
               ),
-              SizedBox(height: 20),
-              if (!isAssigned && !isCompleted)
-                Center(
-                  child: ElevatedButton(
-                    onPressed: () => _assignToEmergency(context, doc),
-                    child: Text('Assign to Emergency', style: TextStyle(color: Colors.black)),
-                  ),
-                ),
-              if (isAssigned)
-                FutureBuilder<String>(
-                  future: _getStaffDetails(data['assignedTo']),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Text(
-                        'Loading...',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black,
-                        ),
-                      );
-                    }
-                    if (snapshot.hasError) {
-                      return Text(
-                        'Assigned to: Unknown Staff',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black,
-                        ),
-                      );
-                    }
+            if (isCompleted)
+              FutureBuilder<String>(
+                future: data['completedBy'] != null ? _getStaffDetails(data['completedBy']) : Future.value('Unknown Staff'),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
                     return Text(
-                      'Assigned to: ${snapshot.data}',
+                      'Loading...',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
                       ),
                     );
-                  },
-                ),
-              if (isCompleted)
-                FutureBuilder<String>(
-                  future: _getStaffDetails(data['assignedTo']),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Text(
-                        'Loading...',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black,
-                        ),
-                      );
-                    }
-                    if (snapshot.hasError) {
-                      return Text(
-                        'Completed by: Unknown Staff',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black,
-                        ),
-                      );
-                    }
+                  }
+                  if (snapshot.hasError) {
                     return Text(
-                      'Completed by: ${snapshot.data}',
+                      'Completed by: Unknown Staff',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
                       ),
                     );
-                  },
-                ),
-            ],
-          ),
+                  }
+                  return Text(
+                    'Completed by: ${snapshot.data}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black,
+                    ),
+                  );
+                },
+              ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -516,7 +508,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
               Text(
                 'Emergency Alerts',
                 style: GoogleFonts.quicksand(
-                  textStyle: TextStyle(fontSize: 27, color: const Color.fromARGB(255, 255, 255, 255), fontWeight: FontWeight.bold),
+                  textStyle: TextStyle(fontSize: 27, color: const Color.fromRGBO(226, 192, 68, 1), fontWeight: FontWeight.bold),
                 ),
               ),
               SizedBox(height: 20),
@@ -564,9 +556,31 @@ class _StaffMainPageState extends State<StaffMainPage> {
                       ),
               ),
               SizedBox(height: 20),
-              Text(
-                'Completed',
-                style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Completed',
+                    style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ViewCompletedPage(
+                            userId: widget.userId,
+                            fullName: widget.fullName,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'See More',
+                      style: TextStyle(color: Color.fromRGBO(226, 192, 68, 1), fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 10),
               Container(
@@ -580,7 +594,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                       )
                     : ListView(
                         scrollDirection: Axis.horizontal,
-                        children: completedDocs.map((doc) {
+                        children: completedDocs.take(5).map((doc) {
                           return _buildEmergencyCard(doc, false, true);
                         }).toList(),
                       ),
