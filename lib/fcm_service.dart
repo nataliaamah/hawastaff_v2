@@ -1,34 +1,29 @@
-import 'dart:convert';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 
 class FCMService {
   final String projectId;
-  final String serviceAccountKey;
+  final Map<String, dynamic> serviceAccountKey;
 
   FCMService({required this.projectId, required this.serviceAccountKey});
 
-  Future<void> sendPushNotification(String token, String title, String body) async {
-    final accountCredentials = ServiceAccountCredentials.fromJson(serviceAccountKey);
+  Future<void> sendPushNotification(String token, Map<String, dynamic> payload) async {
+    final credentials = ServiceAccountCredentials.fromJson(serviceAccountKey);
+    final httpClient = await clientViaServiceAccount(credentials, ['https://www.googleapis.com/auth/firebase.messaging']);
 
-    final scopes = ['https://www.googleapis.com/auth/cloud-platform'];
-    final client = await clientViaServiceAccount(accountCredentials, scopes);
-
-    final message = {
-      'message': {
-        'token': token,
-        'notification': {
-          'title': title,
-          'body': body,
-        },
+    final response = await httpClient.post(
+      Uri.parse('https://fcm.googleapis.com/v1/projects/$projectId/messages:send'),
+      headers: {
+        'Content-Type': 'application/json',
       },
-    };
-
-    final url = 'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
-    final response = await client.post(
-      Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(message),
+      body: jsonEncode({
+        'message': {
+          'token': token,
+          ...payload,
+        },
+      }),
     );
 
     if (response.statusCode == 200) {

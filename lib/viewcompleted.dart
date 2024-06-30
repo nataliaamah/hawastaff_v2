@@ -14,7 +14,7 @@ class ViewCompletedPage extends StatefulWidget {
     required this.userId,
     required this.fullName,
     this.titleSize = 20.0,
-    this.listHeight = 250.0, // Adjusted height for the list card
+    this.listHeight = 250.0,
   });
 
   @override
@@ -38,6 +38,7 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
       final snapshot = await FirebaseFirestore.instance
           .collection('staff_emergency')
           .where('status', isEqualTo: 'completed')
+          .orderBy('timestamp', descending: true)
           .get();
       setState(() {
         completedDocs = snapshot.docs;
@@ -177,8 +178,8 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
         );
       },
       child: Container(
-        width: 320, // Longer width for title card
-        height: widget.listHeight, // Custom height for list card
+        width: 320,
+        height: widget.listHeight,
         margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
         decoration: BoxDecoration(
           color: Colors.green.shade100,
@@ -429,7 +430,7 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
             child: _isTileView
                 ? GridView.builder(
                     padding: EdgeInsets.all(8.0),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.65),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.5),
                     itemCount: filteredDocs.length,
                     itemBuilder: (context, index) {
                       return _buildEmergencyCard(filteredDocs[index]);

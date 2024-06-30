@@ -67,11 +67,27 @@ class _StaffMainPageState extends State<StaffMainPage> {
 
   final double _range = 10.0; // Range in kilometers
 
+  final Map<String, dynamic> serviceAccountKey = {
+    "type": "service_account",
+    "project_id": "hawa-24",
+    "private_key_id": "f7a5778be61ef25c70490a78baf00b840709a1be",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDBohnaO5qp9stX\nYyWEp1jACqNtJorWu9k1ZKDADg/3mnEZoKQFyt+ti1TMAya6inszbjzxj6tVSvhe\ncTV1ujfS9BgBwA/XFJ9IOSgE+is5FP2bzgGrUreCRp1vwYLO7rBIz79P6Vr/6irw\nwJ7gADBHSO22NI17h7ddPBT//Rsq7hXecTjOPkHPBoLEmMovrwVtg63p4mySdrgE\nBWcUaSzHgEOFvbqNUjMtdTFd/4s3AZckXbKITba25Y1m8OPx+tm3Z4afhVTG7m2L\nxQb+EyvgO4YKimN80CcEjP0DFdqVpvJ+ZKXg5q+IUa68gDh9ji3zIAefbx6Dd5qz\n7Ujml9FNAgMBAAECggEAFbMlY4wXdqG2QwpU64tXiloG25YcrBjsLCwlSbCpwG1Z\n7G3Qw+dq7sd1DtHxlqkrSmW5xbZ8lHfs4qScQZ/HXshFInkULV3dxdnF7tzcWC7O\nhxXsoPcJortoLFyK3MbqEZbakUmNDa3/9vAXPfI3dt2o6ij0jBn3BidUESYb09Ed\nztrv4ai4Q0tNMkkCczSv+yUt8FMBgwvTIXWm6m/5DZoyYcMt88Uaj+tx5m1shjon\nQUH1q14ddOvbBiCs2oQ5UQjmTBbGU7J69T1mnHc996ePKjNcfb7J2jO2blhBR1mh\n3eTdikpssvollDEb36GDJ0OFd0nNwU1QB550xE6SDwKBgQDj1q33oKoPZBCktL9L\nCq5d2aVGzrIDQTB1YgHyQLS/1Ex9bYq03JBDPwDlanORv5fznU222LxpQU1ogDuN\nUf86EhtqQTwRIB89o3KtQYo38c/J+ob51yQcXNfneGdPtWDVTdmkH2vccRp/BUqA\nbub9c8E1EM83HZ0f9sUzTpXtcwKBgQDZkRY9D8p4cWyI+bEA0Z9HHpKa/T/tk6nW\ndvlRTjpBbf3D1I8fLAYfF0DEsnEeniGpZ2fbkm97HpUzYmw+9+wDkaGIBYFiqDFf\nAfsKmbyB2eg6qv/rnxv+6LGyz2BkGFfHSTr60GHH58O02pUHzKg+HdrHp2FjXA55\nGmElyuuWPwKBgQC2axQux7xhRkTtGqpucsbY7YGfB68PXApocWgNhjExxdDYO/Rq\nio4WyUL2bBzL/RK0QqYOV8nCnD5WBRWpOJWY8RZyJHjrXUSmHU+b2HXKBRnRJX0c\nXFzVOKDE+2n8L8SwA/zVozLA9O259YqI+kKHez6eNi8yectr5DBPvAPecQKBgCLU\ns3a7HHMD1ZhoQQochR9hqZ7ehGmIhlwrV+bIW1M2RLYhRXh8F87KbjgPSUTZlBIG\n1/2zB93yG3jKfQHntwUrP20DVJ9yxdSsAIDF9APl2uPplGcoZdb9cdVqlcfwjbz9\n4E9fJQhX9mDxzYIeJaEsLmZgSZsalcaVjo/6WJUJAoGBALCt+cfvMuPKLuMbFRpr\nJX6c8To4Ey0mJ/977/YjeWfjl4dug9KgUSwZ7RwEswTcNqK3psNmt+dQVTC4Bi6P\nkzbAhcUIH35auBcaxMI/Hg4HkUgzQaYaJdmK1S6p3ATzpKxgr96b7aA+XCP8pujc\ngc4otDfF0Vf5RlAB2N+iDcrS\n-----END PRIVATE KEY-----\n",
+    "client_email": "firebase-adminsdk-2qfvg@hawa-24.iam.gserviceaccount.com",
+    "client_id": "110037181356922537592",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2qfvg%40hawa-24.iam.gserviceaccount.com"
+  };
+
+  late final FCMService fcmService;
+
   @override
   void initState() {
     super.initState();
     _initializeLocationAndData();
     staffName = widget.fullName; // Initialize staffName with the value passed to the widget
+    fcmService = FCMService(projectId: 'hawa-24', serviceAccountKey: serviceAccountKey); // Initialize FCMService
 
     _firebaseMessaging.requestPermission();
 
@@ -176,44 +192,34 @@ class _StaffMainPageState extends State<StaffMainPage> {
     }
   }
 
-void _sendPushNotification(DocumentSnapshot doc) async {
-  final data = doc.data() as Map<String, dynamic>?;
-  if (data != null) {
-    final fcmService = FCMService(
-      projectId: 'hawa-24',
-      serviceAccountKey: '''{
-        "type": "service_account",
-        "project_id": "hawa-24",
-        "private_key_id": "f7a5778be61ef25c70490a78baf00b840709a1be",
-        "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDBohnaO5qp9stX\nYyWEp1jACqNtJorWu9k1ZKDADg/3mnEZoKQFyt+ti1TMAya6inszbjzxj6tVSvhe\ncTV1ujfS9BgBwA/XFJ9IOSgE+is5FP2bzgGrUreCRp1vwYLO7rBIz79P6Vr/6irw\nwJ7gADBHSO22NI17h7ddPBT//Rsq7hXecTjOPkHPBoLEmMovrwVtg63p4mySdrgE\nBWcUaSzHgEOFvbqNUjMtdTFd/4s3AZckXbKITba25Y1m8OPx+tm3Z4afhVTG7m2L\nxQb+EyvgO4YKimN80CcEjP0DFdqVpvJ+ZKXg5q+IUa68gDh9ji3zIAefbx6Dd5qz\n7Ujml9FNAgMBAAECggEAFbMlY4wXdqG2QwpU64tXiloG25YcrBjsLCwlSbCpwG1Z\n7G3Qw+dq7sd1DtHxlqkrSmW5xbZ8lHfs4qScQZ/HXshFInkULV3dxdnF7tzcWC7O\nhxXsoPcJortoLFyK3MbqEZbakUmNDa3/9vAXPfI3dt2o6ij0jBn3BidUESYb09Ed\nztrv4ai4Q0tNMkkCczSv+yUt8FMBgwvTIXWm6m/5DZoyYcMt88Uaj+tx5m1shjon\nQUH1q14ddOvbBiCs2oQ5UQjmTBbGU7J69T1mnHc996ePKjNcfb7J2jO2blhBR1mh\n3eTdikpssvollDEb36GDJ0OFd0nNwU1QB550xE6SDwKBgQDj1q33oKoPZBCktL9L\nCq5d2aVGzrIDQTB1YgHyQLS/1Ex9bYq03JBDPwDlanORv5fznU222LxpQU1ogDuN\nUf86EhtqQTwRIB89o3KtQYo38c/J+ob51yQcXNfneGdPtWDVTdmkH2vccRp/BUqA\nbub9c8E1EM83HZ0f9sUzTpXtcwKBgQDZkRY9D8p4cWyI+bEA0Z9HHpKa/T/tk6nW\ndvlRTjpBbf3D1I8fLAYfF0DEsnEeniGpZ2fbkm97HpUzYmw+9+wDkaGIBYFiqDFf\nAfsKmbyB2eg6qv/rnxv+6LGyz2BkGFfHSTr60GHH58O02pUHzKg+HdrHp2FjXA55\nGmElyuuWPwKBgQC2axQux7xhRkTtGqpucsbY7YGfB68PXApocWgNhjExxdDYO/Rq\nio4WyUL2bBzL/RK0QqYOV8nCnD5WBRWpOJWY8RZyJHjrXUSmHU+b2HXKBRnRJX0c\nXFzVOKDE+2n8L8SwA/zVozLA9O259YqI+kKHez6eNi8yectr5DBPvAPecQKBgCLU\ns3a7HHMD1ZhoQQochR9hqZ7ehGmIhlwrV+bIW1M2RLYhRXh8F87KbjgPSUTZlBIG\n1/2zB93yG3jKfQHntwUrP20DVJ9yxdSsAIDF9APl2uPplGcoZdb9cdVqlcfwjbz9\n4E9fJQhX9mDxzYIeJaEsLmZgSZsalcaVjo/6WJUJAoGBALCt+cfvMuPKLuMbFRpr\nJX6c8To4Ey0mJ/977/YjeWfjl4dug9KgUSwZ7RwEswTcNqK3psNmt+dQVTC4Bi6P\nkzbAhcUIH35auBcaxMI/Hg4HkUgzQaYaJdmK1S6p3ATzpKxgr96b7aA+XCP8pujc\ngc4otDfF0Vf5RlAB2N+iDcrS\n-----END PRIVATE KEY-----\n",
-        "client_email": "firebase-adminsdk-2qfvg@hawa-24.iam.gserviceaccount.com",
-        "client_id": "110037181356922537592",
-        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://oauth2.googleapis.com/token",
-        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2qfvg@hawa-24.iam.gserviceaccount.com",
-        "universe_domain": "googleapis.com"
-      }'''
-    );
+  void _sendPushNotification(DocumentSnapshot doc) async {
+    final data = doc.data() as Map<String, dynamic>?;
+    if (data != null) {
+      final payload = {
+        'notification': {
+          'title': 'New Emergency',
+          'body': 'An emergency has been reported at ${data['location']}.',
+        },
+        'priority': 'high',
+        'data': {
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+          'id': '1',
+          'status': 'done'
+        }
+      };
 
-    try {
-      final tokens = await FirebaseFirestore.instance.collection('user_tokens').get();
+      try {
+        final tokens = await FirebaseFirestore.instance.collection('user_tokens').get();
 
-      for (var tokenDoc in tokens.docs) {
-        final token = tokenDoc.data()['token'];
-        await fcmService.sendPushNotification(
-          token,
-          'New Emergency',
-          'An emergency has been reported at ${data['location']}.'
-        );
+        for (var tokenDoc in tokens.docs) {
+          final token = tokenDoc.data()['token'];
+          await fcmService.sendPushNotification(token, payload);
+        }
+      } catch (e) {
+        print('Error sending FCM request: $e');
       }
-    } catch (e) {
-      print('Error sending FCM request: $e');
     }
   }
-}
-
-
 
   @override
   void dispose() {
@@ -369,6 +375,10 @@ void _sendPushNotification(DocumentSnapshot doc) async {
     final data = doc.data() as Map<String, dynamic>?;
     if (data == null) return SizedBox.shrink();
 
+    final cardColor = isAssigned
+        ? _getRandomColor(_yellowOrangeColors)
+        : _getRandomColor(_redColors);
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -383,7 +393,7 @@ void _sendPushNotification(DocumentSnapshot doc) async {
         height: 350,  // Adjusted height
         margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
         decoration: BoxDecoration(
-          color: Colors.green.shade100,
+          color: cardColor,
           borderRadius: BorderRadius.circular(16.0),
         ),
         child: Padding(
@@ -567,9 +577,9 @@ void _sendPushNotification(DocumentSnapshot doc) async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromRGBO(2, 1, 34, 1),
+      backgroundColor: const Color.fromRGBO(197, 197, 197, 1),
       appBar: AppBar(
-        backgroundColor: const Color.fromRGBO(2, 1, 34, 1),
+        backgroundColor: const Color.fromRGBO(197, 197, 197, 1),
         elevation: 0,
         automaticallyImplyLeading: false,
         centerTitle: true,
@@ -578,14 +588,6 @@ void _sendPushNotification(DocumentSnapshot doc) async {
           height: 200,
           width: 200,
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: () {
-              // Search functionality here
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -600,7 +602,7 @@ void _sendPushNotification(DocumentSnapshot doc) async {
                     SizedBox(width: 5),
                     Text(
                       _currentLocation,
-                      style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 12, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -612,16 +614,9 @@ void _sendPushNotification(DocumentSnapshot doc) async {
                     SizedBox(width: 5),
                     Text(
                       staffName,
-                      style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 12, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: const Color.fromRGBO(2, 1, 34, 1), fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ],
-                ),
-                SizedBox(height: 20),
-                Text(
-                  'Emergency Alerts',
-                  style: GoogleFonts.quicksand(
-                    textStyle: TextStyle(fontSize: 27, color: const Color.fromRGBO(226, 192, 68, 1), fontWeight: FontWeight.bold),
-                  ),
                 ),
                 SizedBox(height: 20),
               ],
@@ -636,12 +631,18 @@ void _sendPushNotification(DocumentSnapshot doc) async {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        'Emergency Alerts',
+                        style: GoogleFonts.quicksand(
+                          textStyle: TextStyle(fontSize: 27, color: const Color.fromRGBO(226, 192, 68, 1), fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       Padding(
                         padding: EdgeInsets.only(left: 10),
                         child: Text(
-                        'New Emergencies',
-                        style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
+                          'New Emergencies',
+                          style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
                       ),
                       SizedBox(height: 10),
                       Container(
@@ -665,9 +666,9 @@ void _sendPushNotification(DocumentSnapshot doc) async {
                       Padding(
                         padding : EdgeInsets.only(left: 10),
                         child : Text(
-                        'In Investigation',
-                        style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
+                          'In Investigation',
+                          style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
                       ),
                       SizedBox(height: 10),
                       Container(
@@ -694,9 +695,9 @@ void _sendPushNotification(DocumentSnapshot doc) async {
                           Padding(
                             padding: EdgeInsets.only(left: 10),
                             child : Text(
-                            'Completed',
-                            style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
+                              'Completed',
+                              style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
                           ),
                           GestureDetector(
                             onTap: () {
@@ -724,7 +725,7 @@ void _sendPushNotification(DocumentSnapshot doc) async {
                             ? Center(
                                 child: Text(
                                   'No completed emergencies',
-                                  style: TextStyle(color: Colors.white, fontSize: 18),
+                                  style: TextStyle(color: const Color.fromARGB(255, 91, 91, 91), fontSize: 18),
                                 ),
                               )
                             : ListView(
@@ -750,7 +751,7 @@ class PersonalInfoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Color.fromRGBO(64, 64, 66, 1)
+      ..color = Color.fromRGBO(2, 1, 34, 1)
       ..style = PaintingStyle.fill;
 
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
