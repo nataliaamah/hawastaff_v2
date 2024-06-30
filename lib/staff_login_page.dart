@@ -77,42 +77,60 @@ class _StaffLoginPageState extends State<StaffLoginPage> {
       barrierDismissible: false, // Prevent closing the dialog by tapping outside
       builder: (context) {
         return AlertDialog(
-          title: Text('Enter Staff Code'),
-          content: TextField(
-            controller: _staffCodeController,
-            decoration: InputDecoration(
-              labelText: 'Staff Code',
-              labelStyle: TextStyle(color: Colors.black),
-              filled: true,
-              fillColor: Color.fromRGBO(255, 255, 255, 0.2),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
+          title: Text('Enter Staff Code or Logout'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _staffCodeController,
+                decoration: InputDecoration(
+                  labelText: 'Staff Code',
+                  labelStyle: TextStyle(color: Colors.black),
+                  filled: true,
+                  fillColor: Color.fromRGBO(255, 255, 255, 0.2),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  prefixIcon: Icon(Icons.code, color: Color.fromRGBO(226, 192, 68, 1)), // Yellow code icon
+                ),
               ),
-              prefixIcon: Icon(Icons.code, color: Color.fromRGBO(226, 192, 68, 1)), // Yellow code icon
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                String enteredCode = _staffCodeController.text.trim();
-                DocumentSnapshot staffCodeDoc = await FirebaseFirestore.instance
-                    .collection('staff_code')
-                    .doc('police')
-                    .get();
+              SizedBox(height: 16.0),
+              ElevatedButton(
+                onPressed: () async {
+                  String enteredCode = _staffCodeController.text.trim();
+                  DocumentSnapshot staffCodeDoc = await FirebaseFirestore.instance
+                      .collection('staff_code')
+                      .doc('police')
+                      .get();
 
-                if (staffCodeDoc.exists && staffCodeDoc['code'] == enteredCode) {
-                  // Staff code is valid
-                  verified = true;
+                  if (staffCodeDoc.exists && staffCodeDoc['code'] == enteredCode) {
+                    // Staff code is valid
+                    verified = true;
+                    Navigator.of(context).pop();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Invalid staff code")),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color.fromRGBO(226, 192, 68, 1),
+                  padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                ),
+                child: Text('Submit', style: TextStyle(color: Colors.white)),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await _auth.signOut();
                   Navigator.of(context).pop();
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Invalid staff code")),
-                  );
-                }
-              },
-              child: Text('Submit', style: TextStyle(color: Colors.blue)),
-            ),
-          ],
+                },
+                child: Text('Logout', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -129,11 +147,12 @@ class _StaffLoginPageState extends State<StaffLoginPage> {
         MaterialPageRoute(
           builder: (context) => StaffMainPage(
             userId: userId,
-            fullName: fullName,
+            fullName: fullName,  // Ensure fullName is passed here
             isAuthenticated: true,
           ),
         ),
       );
+
     } else {
       _auth.signOut(); // Sign out the user if the staff code verification fails
     }

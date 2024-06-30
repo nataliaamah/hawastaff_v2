@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,8 +8,11 @@ import 'package:flutter_vibrate/flutter_vibrate.dart';
 import 'package:intl/intl.dart';
 import 'package:location/location.dart' as loc;
 import 'package:geocoding/geocoding.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:http/http.dart' as http;
 import 'emergencyview.dart';
 import 'viewcompleted.dart';
+import 'fcm_service.dart';
 
 class StaffMainPage extends StatefulWidget {
   final String userId;
@@ -34,6 +38,8 @@ class _StaffMainPageState extends State<StaffMainPage> {
   List<DocumentSnapshot> completedDocs = [];
   String _currentLocation = 'Fetching...';
   loc.LocationData? _staffLocation;
+  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  late String staffName;
 
   final List<Color> _redColors = [
     Colors.red.shade100,
@@ -65,6 +71,49 @@ class _StaffMainPageState extends State<StaffMainPage> {
   void initState() {
     super.initState();
     _initializeLocationAndData();
+    staffName = widget.fullName; // Initialize staffName with the value passed to the widget
+
+    _firebaseMessaging.requestPermission();
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+
+      if (notification != null && android != null) {
+        showDialog(
+          context: context,
+          builder: (_) {
+            return AlertDialog(
+              title: Text(notification.title ?? 'New Emergency'),
+              content: Text(notification.body ?? 'An emergency has been reported.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    });
+
+    _firebaseMessaging.getToken().then((String? token) {
+      assert(token != null);
+      print("FCM Token: $token");
+      saveTokenToDatabase(token);
+    });
+  }
+
+  void saveTokenToDatabase(String? token) async {
+    if (token != null) {
+      await FirebaseFirestore.instance
+          .collection('user_tokens')
+          .doc(widget.userId)
+          .set({
+        'token': token,
+      });
+    }
   }
 
   void _initializeLocationAndData() async {
@@ -116,6 +165,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
 
           if (unresolvedDocs.isNotEmpty && !_isVibrating) {
             _startVibrating();
+            _sendPushNotification(unresolvedDocs.first);
           } else if (unresolvedDocs.isEmpty && _isVibrating) {
             _stopVibrating();
           }
@@ -125,6 +175,45 @@ class _StaffMainPageState extends State<StaffMainPage> {
       print('Error initializing location and data: $e');
     }
   }
+
+void _sendPushNotification(DocumentSnapshot doc) async {
+  final data = doc.data() as Map<String, dynamic>?;
+  if (data != null) {
+    final fcmService = FCMService(
+      projectId: 'hawa-24',
+      serviceAccountKey: '''{
+        "type": "service_account",
+        "project_id": "hawa-24",
+        "private_key_id": "f7a5778be61ef25c70490a78baf00b840709a1be",
+        "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDBohnaO5qp9stX\nYyWEp1jACqNtJorWu9k1ZKDADg/3mnEZoKQFyt+ti1TMAya6inszbjzxj6tVSvhe\ncTV1ujfS9BgBwA/XFJ9IOSgE+is5FP2bzgGrUreCRp1vwYLO7rBIz79P6Vr/6irw\nwJ7gADBHSO22NI17h7ddPBT//Rsq7hXecTjOPkHPBoLEmMovrwVtg63p4mySdrgE\nBWcUaSzHgEOFvbqNUjMtdTFd/4s3AZckXbKITba25Y1m8OPx+tm3Z4afhVTG7m2L\nxQb+EyvgO4YKimN80CcEjP0DFdqVpvJ+ZKXg5q+IUa68gDh9ji3zIAefbx6Dd5qz\n7Ujml9FNAgMBAAECggEAFbMlY4wXdqG2QwpU64tXiloG25YcrBjsLCwlSbCpwG1Z\n7G3Qw+dq7sd1DtHxlqkrSmW5xbZ8lHfs4qScQZ/HXshFInkULV3dxdnF7tzcWC7O\nhxXsoPcJortoLFyK3MbqEZbakUmNDa3/9vAXPfI3dt2o6ij0jBn3BidUESYb09Ed\nztrv4ai4Q0tNMkkCczSv+yUt8FMBgwvTIXWm6m/5DZoyYcMt88Uaj+tx5m1shjon\nQUH1q14ddOvbBiCs2oQ5UQjmTBbGU7J69T1mnHc996ePKjNcfb7J2jO2blhBR1mh\n3eTdikpssvollDEb36GDJ0OFd0nNwU1QB550xE6SDwKBgQDj1q33oKoPZBCktL9L\nCq5d2aVGzrIDQTB1YgHyQLS/1Ex9bYq03JBDPwDlanORv5fznU222LxpQU1ogDuN\nUf86EhtqQTwRIB89o3KtQYo38c/J+ob51yQcXNfneGdPtWDVTdmkH2vccRp/BUqA\nbub9c8E1EM83HZ0f9sUzTpXtcwKBgQDZkRY9D8p4cWyI+bEA0Z9HHpKa/T/tk6nW\ndvlRTjpBbf3D1I8fLAYfF0DEsnEeniGpZ2fbkm97HpUzYmw+9+wDkaGIBYFiqDFf\nAfsKmbyB2eg6qv/rnxv+6LGyz2BkGFfHSTr60GHH58O02pUHzKg+HdrHp2FjXA55\nGmElyuuWPwKBgQC2axQux7xhRkTtGqpucsbY7YGfB68PXApocWgNhjExxdDYO/Rq\nio4WyUL2bBzL/RK0QqYOV8nCnD5WBRWpOJWY8RZyJHjrXUSmHU+b2HXKBRnRJX0c\nXFzVOKDE+2n8L8SwA/zVozLA9O259YqI+kKHez6eNi8yectr5DBPvAPecQKBgCLU\ns3a7HHMD1ZhoQQochR9hqZ7ehGmIhlwrV+bIW1M2RLYhRXh8F87KbjgPSUTZlBIG\n1/2zB93yG3jKfQHntwUrP20DVJ9yxdSsAIDF9APl2uPplGcoZdb9cdVqlcfwjbz9\n4E9fJQhX9mDxzYIeJaEsLmZgSZsalcaVjo/6WJUJAoGBALCt+cfvMuPKLuMbFRpr\nJX6c8To4Ey0mJ/977/YjeWfjl4dug9KgUSwZ7RwEswTcNqK3psNmt+dQVTC4Bi6P\nkzbAhcUIH35auBcaxMI/Hg4HkUgzQaYaJdmK1S6p3ATzpKxgr96b7aA+XCP8pujc\ngc4otDfF0Vf5RlAB2N+iDcrS\n-----END PRIVATE KEY-----\n",
+        "client_email": "firebase-adminsdk-2qfvg@hawa-24.iam.gserviceaccount.com",
+        "client_id": "110037181356922537592",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2qfvg@hawa-24.iam.gserviceaccount.com",
+        "universe_domain": "googleapis.com"
+      }'''
+    );
+
+    try {
+      final tokens = await FirebaseFirestore.instance.collection('user_tokens').get();
+
+      for (var tokenDoc in tokens.docs) {
+        final token = tokenDoc.data()['token'];
+        await fcmService.sendPushNotification(
+          token,
+          'New Emergency',
+          'An emergency has been reported at ${data['location']}.'
+        );
+      }
+    } catch (e) {
+      print('Error sending FCM request: $e');
+    }
+  }
+}
+
+
 
   @override
   void dispose() {
@@ -522,7 +611,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                     Icon(Icons.person, color: Colors.orange,),
                     SizedBox(width: 5),
                     Text(
-                      widget.fullName,
+                      staffName,
                       style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ],
@@ -551,7 +640,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                         padding: EdgeInsets.only(left: 10),
                         child: Text(
                         'New Emergencies',
-                        style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       ),
                       SizedBox(height: 10),
@@ -577,7 +666,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                         padding : EdgeInsets.only(left: 10),
                         child : Text(
                         'In Investigation',
-                        style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       ),
                       SizedBox(height: 10),
@@ -606,7 +695,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                             padding: EdgeInsets.only(left: 10),
                             child : Text(
                             'Completed',
-                            style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           ),
                           GestureDetector(
@@ -616,14 +705,14 @@ class _StaffMainPageState extends State<StaffMainPage> {
                                 MaterialPageRoute(
                                   builder: (context) => ViewCompletedPage(
                                     userId: widget.userId,
-                                    fullName: widget.fullName,
+                                    fullName: staffName,
                                   ),
                                 ),
                               );
                             },
                             child: Text(
                               'See More',
-                              style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 14, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: Color.fromRGBO(226, 192, 68, 1), fontSize: 14, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
@@ -661,7 +750,7 @@ class PersonalInfoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Color.fromRGBO(197, 197, 197, 1)
+      ..color = Color.fromRGBO(64, 64, 66, 1)
       ..style = PaintingStyle.fill;
 
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);

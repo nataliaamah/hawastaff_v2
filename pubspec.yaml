@@ -30,6 +30,9 @@ dependencies:
   carousel_slider: ^4.2.1
   firebase_messaging: ^15.0.2
   flutter_local_notifications: ^17.2.1
+  http: ^1.2.1
+  googleapis_auth: ^1.6.0
+  googleapis: ^13.1.0
 
 dev_dependencies:
   flutter_test:

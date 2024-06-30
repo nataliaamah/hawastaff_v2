@@ -19,6 +19,13 @@ class StaffEmergencyViewPage extends StatefulWidget {
 
 class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
   bool _isMapLoading = true;
+  String _locationAddress = 'Fetching address...';
+
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
 
   void _openInGoogleMaps(double latitude, double longitude) async {
     final googleMapsUrl = 'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude';
@@ -54,7 +61,7 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
   }
 
   Future<String> _fetchAddress(double latitude, double longitude) async {
-    final googleMapsUrl = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=$latitude,$longitude&key=YOUR_GOOGLE_MAPS_API_KEY';
+    final googleMapsUrl = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=$latitude,$longitude&key=AIzaSyBbgGgnpr_kbshLxOL7GuY28xqd7EtX1dw';
     final response = await http.get(Uri.parse(googleMapsUrl));
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -63,6 +70,21 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
       }
     }
     return 'Unknown location';
+  }
+
+  void _initialize() async {
+    final Map<String, dynamic>? data = widget.emergencyData.data() as Map<String, dynamic>?;
+    final GeoPoint location = data?['location'] ?? GeoPoint(0, 0);
+    final double latitude = location.latitude;
+    final double longitude = location.longitude;
+
+    final address = await _fetchAddress(latitude, longitude);
+
+    if (mounted) {
+      setState(() {
+        _locationAddress = address;
+      });
+    }
   }
 
   int _calculateAge(String dateOfBirth) {
@@ -110,6 +132,11 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
             IconButton(
               icon: Icon(Icons.check, color: Colors.white),
               onPressed: () => _markAsResolved(context),
+            )
+          else
+            IconButton(
+              icon: Icon(Icons.check, color: Colors.grey),
+              onPressed: null,
             ),
         ],
       ),
@@ -213,35 +240,12 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
                           ),
                         ),
                         SizedBox(height: 10),
-                        FutureBuilder<String>(
-                          future: _fetchAddress(latitude, longitude),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return Text(
-                                'Fetching address...',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white,
-                                ),
-                              );
-                            }
-                            if (snapshot.hasError) {
-                              return Text(
-                                'Unknown location',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white,
-                                ),
-                              );
-                            }
-                            return Text(
-                              snapshot.data ?? 'Unknown location',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
-                              ),
-                            );
-                          },
+                        Text(
+                          _locationAddress,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                          ),
                         ),
                         if (assignedTo.isEmpty) ...[
                           SizedBox(height: 20),
@@ -254,13 +258,28 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
                         ] else ...[
                           SizedBox(height: 20),
                           Center(
-                            child: Text(
-                              'Assigned to: ${data?['assignedToName'] ?? 'Unknown'}',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            child: FutureBuilder<Map<String, dynamic>>(
+                              future: _fetchUserDetails(assignedTo),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) {
+                                  return CircularProgressIndicator();
+                                }
+
+                                final assignedStaffDetails = snapshot.data!;
+                                final String assignedToName = assignedStaffDetails['fullName'] ?? 'Unknown';
+                                final String staffCode = assignedStaffDetails['staffNumber'] ?? 'Unknown';
+                                final String position = assignedStaffDetails['position'] ?? 'Unknown';
+
+                                return Text(
+                                  'Assigned to: $assignedToName (Code: $staffCode, Position: $position)',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                );
+                              },
                             ),
                           ),
                         ],

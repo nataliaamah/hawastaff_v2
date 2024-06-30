@@ -25,7 +25,7 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
   bool _isTileView = true;
   List<DocumentSnapshot> completedDocs = [];
   String _filter = 'all';
-  String _searchQuery = '';
+  DateTime? _selectedDate;
 
   @override
   void initState() {
@@ -59,26 +59,15 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
     });
   }
 
-  void _setSearchQuery(String query) {
-    setState(() {
-      _searchQuery = query;
-    });
-  }
-
-  void _clearSearchQuery() {
-    setState(() {
-      _searchQuery = '';
-    });
-  }
-
   void _clearFilter() {
     setState(() {
       _filter = 'all';
+      _selectedDate = null;
     });
   }
 
   List<DocumentSnapshot> get filteredDocs {
-    if (_filter == 'all' && _searchQuery.isEmpty) return completedDocs;
+    if (_filter == 'all' && _selectedDate == null) return completedDocs;
 
     final now = DateTime.now();
     final filtered = completedDocs.where((doc) {
@@ -94,16 +83,14 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
             return now.difference(date).inDays <= 7;
           case 'month':
             return date.month == now.month && date.year == now.year;
+          case 'specific':
+            return _selectedDate != null && date.day == _selectedDate!.day && date.month == _selectedDate!.month && date.year == _selectedDate!.year;
           default:
             return true;
         }
       }();
 
-      final address = data['location']?.toString().toLowerCase().trim() ?? '';
-      final searchQuery = _searchQuery.toLowerCase().trim();
-      final matchesSearch = _searchQuery.isEmpty || address.contains(searchQuery);
-
-      return matchesDate && matchesSearch;
+      return matchesDate;
     }).toList();
 
     return filtered;
@@ -140,9 +127,22 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
                 },
               ),
               ListTile(
+                title: Text('Specific Date'),
+                onTap: () async {
+                  DateTime? pickedDate = await _selectDate(context);
+                  if (pickedDate != null) {
+                    setState(() {
+                      _selectedDate = pickedDate;
+                      _filter = 'specific';
+                    });
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
+              ListTile(
                 title: Text('All'),
                 onTap: () {
-                  _setFilter('all');
+                  _clearFilter();
                   Navigator.of(context).pop();
                 },
               ),
@@ -153,35 +153,14 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
     );
   }
 
-  Future<String> _showAddressDialog() async {
-    TextEditingController _controller = TextEditingController();
-    await showDialog(
+  Future<DateTime?> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Enter Address'),
-          content: TextField(
-            controller: _controller,
-            decoration: InputDecoration(hintText: 'Address'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop('');
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(_controller.text);
-              },
-              child: Text('OK'),
-            ),
-          ],
-        );
-      },
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
     );
-    return _controller.text;
+    return picked;
   }
 
   Widget _buildEmergencyCard(DocumentSnapshot doc) {
@@ -400,15 +379,6 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
             fontSize: widget.titleSize,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search, color: Colors.white),
-            onPressed: () async {
-              String query = await _showAddressDialog();
-              _setSearchQuery(query);
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -419,7 +389,7 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
                 child: Wrap(
                   spacing: 8.0,
                   children: [
-                    if (_searchQuery.isNotEmpty)
+                    if (_selectedDate != null)
                       Container(
                         margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                         padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
@@ -431,30 +401,7 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              _searchQuery.length > 10 ? '${_searchQuery.substring(0, 10)}...' : _searchQuery,
-                              style: TextStyle(color: Colors.black, fontSize: 16.0),
-                            ),
-                            SizedBox(width: 8.0),
-                            GestureDetector(
-                              onTap: _clearSearchQuery,
-                              child: Icon(Icons.close, color: Colors.red, size: 18.0),
-                            ),
-                          ],
-                        ),
-                      ),
-                    if (_filter != 'all')
-                      Container(
-                        margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(16.0),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _filter,
+                              DateFormat('d/MM/yyyy').format(_selectedDate!),
                               style: TextStyle(color: Colors.black, fontSize: 16.0),
                             ),
                             SizedBox(width: 8.0),
@@ -468,17 +415,13 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
                   ],
                 ),
               ),
-              Row(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.filter_list, color: Colors.white),
-                    onPressed: _showFilterDialog,
-                  ),
-                  IconButton(
-                    icon: Icon(_isTileView ? Icons.view_list : Icons.view_module, color: Colors.white),
-                    onPressed: _toggleView,
-                  ),
-                ],
+              IconButton(
+                icon: Icon(Icons.filter_list, color: Colors.white),
+                onPressed: _showFilterDialog,
+              ),
+              IconButton(
+                icon: Icon(_isTileView ? Icons.view_list : Icons.view_module, color: Colors.white),
+                onPressed: _toggleView,
               ),
             ],
           ),
@@ -486,7 +429,7 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
             child: _isTileView
                 ? GridView.builder(
                     padding: EdgeInsets.all(8.0),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.65, ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.65),
                     itemCount: filteredDocs.length,
                     itemBuilder: (context, index) {
                       return _buildEmergencyCard(filteredDocs[index]);
