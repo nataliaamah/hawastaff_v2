@@ -74,16 +74,18 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
 
   void _initialize() async {
     final Map<String, dynamic>? data = widget.emergencyData.data() as Map<String, dynamic>?;
-    final GeoPoint location = data?['location'] ?? GeoPoint(0, 0);
-    final double latitude = location.latitude;
-    final double longitude = location.longitude;
+    if (data != null && data['location'] != null) {
+      final GeoPoint location = data['location'];
+      final double latitude = location.latitude;
+      final double longitude = location.longitude;
 
-    final address = await _fetchAddress(latitude, longitude);
+      final address = await _fetchAddress(latitude, longitude);
 
-    if (mounted) {
-      setState(() {
-        _locationAddress = address;
-      });
+      if (mounted) {
+        setState(() {
+          _locationAddress = address;
+        });
+      }
     }
   }
 
@@ -103,11 +105,34 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
   @override
   Widget build(BuildContext context) {
     final Map<String, dynamic>? data = widget.emergencyData.data() as Map<String, dynamic>?;
-    final String userId = data?['userId'] ?? ''; // Ensure userId field exists
-    final GeoPoint location = data?['location'] ?? GeoPoint(0, 0);
+    if (data == null) {
+      return Scaffold(
+        backgroundColor: const Color.fromRGBO(2, 1, 34, 1),
+        appBar: AppBar(
+          backgroundColor: const Color.fromRGBO(2, 1, 34, 1),
+          elevation: 0,
+          centerTitle: true,
+          title: Image.asset(
+            'assets/hawa_name.png',
+            height: 200,
+            width: 200,
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+        ),
+        body: Center(child: Text('Invalid Emergency Data', style: TextStyle(color: Colors.white))),
+      );
+    }
+
+    final String userId = data['userId'] ?? ''; // Ensure userId field exists
+    final GeoPoint location = data['location'] ?? GeoPoint(0, 0);
     final double latitude = location.latitude;
     final double longitude = location.longitude;
-    final String assignedTo = data?['assignedTo'] ?? '';
+    final String assignedTo = data['assignedTo'] ?? '';
 
     return Scaffold(
       backgroundColor: const Color.fromRGBO(2, 1, 34, 1),

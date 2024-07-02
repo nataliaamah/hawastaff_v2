@@ -38,10 +38,14 @@ class _ViewCompletedPageState extends State<ViewCompletedPage> {
       final snapshot = await FirebaseFirestore.instance
           .collection('staff_emergency')
           .where('status', isEqualTo: 'completed')
-          .orderBy('timestamp', descending: true)
           .get();
       setState(() {
         completedDocs = snapshot.docs;
+        completedDocs.sort((a, b) {
+          final timestampA = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp;
+          final timestampB = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp;
+          return timestampB.compareTo(timestampA);
+        });
       });
     } catch (e) {
       print('Error fetching completed emergencies: $e');

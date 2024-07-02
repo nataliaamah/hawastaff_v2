@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/widgets.dart';
-import 'staff_signup_page.dart'; // Import the staff signup page
-import 'staffmain.dart'; // Import the staff main page
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'staff_signup_page.dart'; // Import the staff signup page
+import 'staffmain.dart'; // Import the staff main page
 
 class StaffLoginPage extends StatefulWidget {
   @override
@@ -18,6 +17,7 @@ class _StaffLoginPageState extends State<StaffLoginPage> {
   final TextEditingController _staffCodeController = TextEditingController();
   final _auth = FirebaseAuth.instance;
   bool _isLoading = false;
+  bool hasLoggedInBefore = false; // Define hasLoggedInBefore
 
   @override
   void initState() {
@@ -32,6 +32,7 @@ class _StaffLoginPageState extends State<StaffLoginPage> {
     String? fullName = prefs.getString('fullName');
 
     if (isLoggedIn != null && isLoggedIn && userId != null && fullName != null) {
+      hasLoggedInBefore = true; // Set the hasLoggedInBefore flag
       // Request staff code
       _verifyStaffCode(userId, fullName);
     }
@@ -48,16 +49,37 @@ class _StaffLoginPageState extends State<StaffLoginPage> {
         password: _passwordController.text.trim(),
       );
 
-      // Fetch the staff data
-      DocumentSnapshot staffDoc = await FirebaseFirestore.instance
-          .collection('staff')
-          .doc(userCredential.user!.uid)
-          .get();
-      String fullName = staffDoc['name'];
+      // Log user ID
+      print("User ID: ${userCredential.user?.uid}");
 
-      // Request staff code
-      _verifyStaffCode(userCredential.user!.uid, fullName);
-      
+      if (userCredential.user != null) {
+        // Fetch the staff data
+        DocumentSnapshot staffDoc = await FirebaseFirestore.instance
+            .collection('staff')
+            .doc(userCredential.user!.uid)
+            .get();
+
+        if (staffDoc.exists) {
+          String fullName = staffDoc['name'];
+
+          // Save login status to SharedPreferences
+          SharedPreferences prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('isLoggedIn', true);
+          await prefs.setString('userId', userCredential.user!.uid);
+          await prefs.setString('fullName', fullName);
+
+          // Request staff code
+          _verifyStaffCode(userCredential.user!.uid, fullName);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Staff document does not exist")),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("User authentication failed")),
+        );
+      }
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? "Error occurred")),
@@ -77,7 +99,7 @@ class _StaffLoginPageState extends State<StaffLoginPage> {
       barrierDismissible: false, // Prevent closing the dialog by tapping outside
       builder: (context) {
         return AlertDialog(
-          title: Text('Enter Staff Code or Logout'),
+          title: Text('Enter Staff Code'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -122,13 +144,14 @@ class _StaffLoginPageState extends State<StaffLoginPage> {
                 ),
                 child: Text('Submit', style: TextStyle(color: Colors.white)),
               ),
-              TextButton(
-                onPressed: () async {
-                  await _auth.signOut();
-                  Navigator.of(context).pop();
-                },
-                child: Text('Logout', style: TextStyle(color: Colors.red)),
-              ),
+              if (hasLoggedInBefore) // Show logout option only if the user has logged in before
+                TextButton(
+                  onPressed: () async {
+                    await _auth.signOut();
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Logout', style: TextStyle(color: Colors.red)),
+                ),
             ],
           ),
         );
@@ -136,25 +159,20 @@ class _StaffLoginPageState extends State<StaffLoginPage> {
     );
 
     if (verified) {
-      // Save login status to SharedPreferences
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', true);
-      await prefs.setString('userId', userId);
-      await prefs.setString('fullName', fullName);
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => StaffMainPage(
-            userId: userId,
-            fullName: fullName,  // Ensure fullName is passed here
-            isAuthenticated: true,
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => StaffMainPage(
+              userId: userId,
+              fullName: fullName,
+              isAuthenticated: true,
+            ),
           ),
-        ),
-      );
-
+        );
+      });
     } else {
-      _auth.signOut(); // Sign out the user if the staff code verification fails
+      await _auth.signOut(); // Sign out the user if the staff code verification fails
     }
   }
 

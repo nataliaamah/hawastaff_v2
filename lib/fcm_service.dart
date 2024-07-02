@@ -1,7 +1,7 @@
-import 'package:googleapis_auth/auth_io.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
-
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:googleapis_auth/auth_io.dart';
 
 class FCMService {
   final String projectId;
@@ -9,7 +9,7 @@ class FCMService {
 
   FCMService({required this.projectId, required this.serviceAccountKey});
 
-  Future<void> sendPushNotification(String token, Map<String, dynamic> payload) async {
+  Future<void> sendPushNotification(Map<String, dynamic> payload) async {
     final credentials = ServiceAccountCredentials.fromJson(serviceAccountKey);
     final httpClient = await clientViaServiceAccount(credentials, ['https://www.googleapis.com/auth/firebase.messaging']);
 
@@ -19,10 +19,7 @@ class FCMService {
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
-        'message': {
-          'token': token,
-          ...payload,
-        },
+        'message': payload,
       }),
     );
 
@@ -31,5 +28,7 @@ class FCMService {
     } else {
       print('FCM request failed with status ${response.statusCode}: ${response.body}');
     }
+
+    httpClient.close();
   }
 }

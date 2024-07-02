@@ -13,6 +13,8 @@ import 'package:http/http.dart' as http;
 import 'emergencyview.dart';
 import 'viewcompleted.dart';
 import 'fcm_service.dart';
+import 'staffprofileoverlay.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class StaffMainPage extends StatefulWidget {
   final String userId;
@@ -77,7 +79,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
     "token_uri": "https://oauth2.googleapis.com/token",
     "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2qfvg%40hawa-24.iam.gserviceaccount.com"
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2qfvg@hawa-24.iam.gserviceaccount.com"
   };
 
   late final FCMService fcmService;
@@ -200,7 +202,6 @@ class _StaffMainPageState extends State<StaffMainPage> {
           'title': 'New Emergency',
           'body': 'An emergency has been reported at ${data['location']}.',
         },
-        'priority': 'high',
         'data': {
           'click_action': 'FLUTTER_NOTIFICATION_CLICK',
           'id': '1',
@@ -213,7 +214,10 @@ class _StaffMainPageState extends State<StaffMainPage> {
 
         for (var tokenDoc in tokens.docs) {
           final token = tokenDoc.data()['token'];
-          await fcmService.sendPushNotification(token, payload);
+          if (token != null) {
+            payload['token'] = token;
+            await fcmService.sendPushNotification(payload);
+          }
         }
       } catch (e) {
         print('Error sending FCM request: $e');
@@ -375,9 +379,23 @@ class _StaffMainPageState extends State<StaffMainPage> {
     final data = doc.data() as Map<String, dynamic>?;
     if (data == null) return SizedBox.shrink();
 
-    final cardColor = isAssigned
-        ? _getRandomColor(_yellowOrangeColors)
-        : _getRandomColor(_redColors);
+    final cardColor = isCompleted
+        ? _getRandomColor(_greenColors)
+        : isAssigned
+            ? _getRandomColor(_yellowOrangeColors)
+            : _getRandomColor(_redColors);
+
+    final IconData categoryIcon = isCompleted
+        ? Icons.check_circle
+        : isAssigned
+            ? Icons.assignment
+            : Icons.warning;
+
+    final Color iconColor = isCompleted
+        ? Colors.green
+        : isAssigned
+            ? Colors.orange
+            : Colors.red;
 
     return GestureDetector(
       onTap: () {
@@ -389,8 +407,8 @@ class _StaffMainPageState extends State<StaffMainPage> {
         );
       },
       child: Container(
-        width: 250,  // Fixed width
-        height: 350,  // Adjusted height
+        width: 250, // Fixed width
+        height: 350, // Adjusted height
         margin: EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
         decoration: BoxDecoration(
           color: cardColor,
@@ -412,8 +430,8 @@ class _StaffMainPageState extends State<StaffMainPage> {
                     ),
                   ),
                   Icon(
-                    Icons.check_circle,
-                    color: Colors.green,
+                    categoryIcon,
+                    color: iconColor,
                   ),
                 ],
               ),
@@ -559,7 +577,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
                       },
                     ),
                     Text(
-                      'Completed On: ${_formatTimestamp(data['completedOn'])}',
+                      'Completed On: ${_formatTimestamp(data['completedAt'])}',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black,
@@ -577,9 +595,9 @@ class _StaffMainPageState extends State<StaffMainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromRGBO(197, 197, 197, 1),
+      backgroundColor: const Color.fromRGBO(2, 1, 34, 1),
       appBar: AppBar(
-        backgroundColor: const Color.fromRGBO(197, 197, 197, 1),
+        backgroundColor: const Color.fromRGBO(2, 1, 34, 1),
         elevation: 0,
         automaticallyImplyLeading: false,
         centerTitle: true,
@@ -590,38 +608,61 @@ class _StaffMainPageState extends State<StaffMainPage> {
         ),
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.location_pin, color: Colors.red),
-                    SizedBox(width: 5),
-                    Text(
-                      _currentLocation,
-                      style: TextStyle(color: Color.fromRGBO(2, 1, 34, 1), fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+          Row(
+            children: [
+              Icon(Icons.location_pin, color: Colors.red),
+              SizedBox(width: 5),
+              Text(
+                _currentLocation,
+                style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          SizedBox(height: 5),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(Icons.person, color: Colors.orange),
+              SizedBox(width: 5),
+              GestureDetector(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return StaffProfileOverlay(staffId: widget.userId, staffName: staffName);
+                    },
+                  );
+                },
+                child: Text(
+                  staffName,
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 255, 255, 255),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Color.fromRGBO(226, 192, 68, 1),
+                    decorationThickness: 2,
+                  ),
                 ),
-                SizedBox(height: 5,),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Icon(Icons.person, color: Colors.orange,),
-                    SizedBox(width: 5),
-                    Text(
-                      staffName,
-                      style: TextStyle(color: const Color.fromRGBO(2, 1, 34, 1), fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 20),
-              ],
+              ),
+            ],
+          ),
+          SizedBox(height: 20),
+          Center(
+            child : Text(
+            'Emergency Alerts',
+            style: GoogleFonts.quicksand(
+              textStyle: TextStyle(
+                fontSize: 27,
+                color: const Color.fromRGBO(226, 192, 68, 1),
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
+          ),
+          SizedBox(height: 20),
           Expanded(
             child: CustomPaint(
               painter: PersonalInfoPainter(),
@@ -631,17 +672,15 @@ class _StaffMainPageState extends State<StaffMainPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Emergency Alerts',
-                        style: GoogleFonts.quicksand(
-                          textStyle: TextStyle(fontSize: 27, color: const Color.fromRGBO(226, 192, 68, 1), fontWeight: FontWeight.bold),
-                        ),
-                      ),
                       Padding(
                         padding: EdgeInsets.only(left: 10),
                         child: Text(
                           'New Emergencies',
-                          style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Color.fromRGBO(255, 255, 255, 1),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       SizedBox(height: 10),
@@ -651,7 +690,10 @@ class _StaffMainPageState extends State<StaffMainPage> {
                             ? Center(
                                 child: Text(
                                   'No new emergencies',
-                                  style: TextStyle(color: const Color.fromARGB(255, 91, 91, 91), fontSize: 15),
+                                  style: TextStyle(
+                                    color: const Color.fromARGB(255, 91, 91, 91),
+                                    fontSize: 15,
+                                  ),
                                 ),
                               )
                             : ListView(
@@ -661,13 +703,23 @@ class _StaffMainPageState extends State<StaffMainPage> {
                                 }).toList(),
                               ),
                       ),
-                      Divider(height: 10,thickness: 0.5,color: const Color.fromARGB(255, 91, 91, 91), indent: 30, endIndent: 30,),
+                      Divider(
+                        height: 10,
+                        thickness: 0.5,
+                        color: const Color.fromARGB(255, 91, 91, 91),
+                        indent: 30,
+                        endIndent: 30,
+                      ),
                       SizedBox(height: 20),
                       Padding(
-                        padding : EdgeInsets.only(left: 10),
-                        child : Text(
+                        padding: EdgeInsets.only(left: 10),
+                        child: Text(
                           'In Investigation',
-                          style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Color.fromRGBO(255, 255, 255, 1),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       SizedBox(height: 10),
@@ -677,7 +729,10 @@ class _StaffMainPageState extends State<StaffMainPage> {
                             ? Center(
                                 child: Text(
                                   'No emergencies in investigation',
-                                  style: TextStyle(color: Color.fromARGB(255, 91, 91, 91), fontSize: 15),
+                                  style: TextStyle(
+                                    color: Color.fromARGB(255, 91, 91, 91),
+                                    fontSize: 15,
+                                  ),
                                 ),
                               )
                             : ListView(
@@ -687,45 +742,63 @@ class _StaffMainPageState extends State<StaffMainPage> {
                                 }).toList(),
                               ),
                       ),
-                      Divider(height: 10,thickness: 0.5,color: const Color.fromARGB(255, 91, 91, 91), indent: 30, endIndent: 30,),
+                      Divider(
+                        height: 10,
+                        thickness: 0.5,
+                        color: const Color.fromARGB(255, 91, 91, 91),
+                        indent: 30,
+                        endIndent: 30,
+                      ),
                       SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Padding(
                             padding: EdgeInsets.only(left: 10),
-                            child : Text(
-                              'Completed',
-                              style: TextStyle(color: Color.fromRGBO(255, 255, 255, 1), fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ViewCompletedPage(
-                                    userId: widget.userId,
-                                    fullName: staffName,
-                                  ),
-                                ),
-                              );
-                            },
                             child: Text(
-                              'See More',
-                              style: TextStyle(color: Color.fromRGBO(226, 192, 68, 1), fontSize: 14, fontWeight: FontWeight.bold),
+                              'Completed',
+                              style: TextStyle(
+                                color: Color.fromRGBO(255, 255, 255, 1),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
+                          if (completedDocs.length > 5)
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ViewCompletedPage(
+                                      userId: widget.userId,
+                                      fullName: staffName,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                'See More',
+                                style: TextStyle(
+                                  color: Color.fromRGBO(226, 192, 68, 1),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       SizedBox(height: 10),
                       Container(
-                        height: 250.0, // Adjusted height for completed
+                        height: 280.0, // Adjusted height for completed
                         child: completedDocs.isEmpty
                             ? Center(
                                 child: Text(
                                   'No completed emergencies',
-                                  style: TextStyle(color: const Color.fromARGB(255, 91, 91, 91), fontSize: 18),
+                                  style: TextStyle(
+                                    color: const Color.fromARGB(255, 91, 91, 91),
+                                    fontSize: 18,
+                                  ),
                                 ),
                               )
                             : ListView(
@@ -751,7 +824,7 @@ class PersonalInfoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Color.fromRGBO(2, 1, 34, 1)
+      ..color = Color.fromRGBO(43, 43, 45, 1)
       ..style = PaintingStyle.fill;
 
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
