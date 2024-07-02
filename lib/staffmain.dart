@@ -135,64 +135,68 @@ class _StaffMainPageState extends State<StaffMainPage> {
   }
 
   void _initializeLocationAndData() async {
-    try {
-      _staffLocation = await _getCurrentLocation();
-      _convertCoordinatesToAddress(_staffLocation!.latitude!, _staffLocation!.longitude!);
+  try {
+    _staffLocation = await _getCurrentLocation();
+    _convertCoordinatesToAddress(_staffLocation!.latitude!, _staffLocation!.longitude!);
 
-      _subscription = FirebaseFirestore.instance
-          .collection('staff_emergency')
-          .snapshots()
-          .listen((snapshot) {
-        setState(() {
-          unresolvedDocs = snapshot.docs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>?;
-            if (data == null || data['location'] == null) return false;
-            final GeoPoint emergencyLocation = data['location'];
-            return _isWithinRange(emergencyLocation, _staffLocation!) && data['status'] == 'unresolved' && data['assignedTo'] == null;
-          }).toList();
+    _subscription = FirebaseFirestore.instance
+        .collection('staff_emergency')
+        .snapshots()
+        .listen((snapshot) {
+      setState(() {
+        unresolvedDocs = snapshot.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null || data['location'] == null) return false;
+          final GeoPoint emergencyLocation = data['location'];
+          return _isWithinRange(emergencyLocation, _staffLocation!) 
+                 && data['status'] == 'unresolved' 
+                 && data['assignedTo'] == null
+                 && (data['retracted'] == null || data['retracted'] == false); // Filter out retracted = true
+        }).toList();
 
-          assignedDocs = snapshot.docs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>?;
-            if (data == null || data['location'] == null) return false;
-            final GeoPoint emergencyLocation = data['location'];
-            return _isWithinRange(emergencyLocation, _staffLocation!) && data['status'] == 'assigned';
-          }).toList();
+        assignedDocs = snapshot.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null || data['location'] == null) return false;
+          final GeoPoint emergencyLocation = data['location'];
+          return _isWithinRange(emergencyLocation, _staffLocation!) && data['status'] == 'assigned';
+        }).toList();
 
-          completedDocs = snapshot.docs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>?;
-            if (data == null || data['location'] == null) return false;
-            final GeoPoint emergencyLocation = data['location'];
-            return _isWithinRange(emergencyLocation, _staffLocation!) && data['status'] == 'completed';
-          }).toList();
+        completedDocs = snapshot.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null || data['location'] == null) return false;
+          final GeoPoint emergencyLocation = data['location'];
+          return _isWithinRange(emergencyLocation, _staffLocation!) && data['status'] == 'completed';
+        }).toList();
 
-          unresolvedDocs.sort((a, b) {
-            Timestamp aTimestamp = a['timestamp'];
-            Timestamp bTimestamp = b['timestamp'];
-            return bTimestamp.compareTo(aTimestamp);
-          });
-          assignedDocs.sort((a, b) {
-            Timestamp aTimestamp = a['timestamp'];
-            Timestamp bTimestamp = b['timestamp'];
-            return bTimestamp.compareTo(aTimestamp);
-          });
-          completedDocs.sort((a, b) {
-            Timestamp aTimestamp = a['timestamp'];
-            Timestamp bTimestamp = b['timestamp'];
-            return bTimestamp.compareTo(aTimestamp);
-          });
-
-          if (unresolvedDocs.isNotEmpty && !_isVibrating) {
-            _startVibrating();
-            _sendPushNotification(unresolvedDocs.first);
-          } else if (unresolvedDocs.isEmpty && _isVibrating) {
-            _stopVibrating();
-          }
+        unresolvedDocs.sort((a, b) {
+          Timestamp aTimestamp = a['timestamp'];
+          Timestamp bTimestamp = b['timestamp'];
+          return bTimestamp.compareTo(aTimestamp);
         });
+        assignedDocs.sort((a, b) {
+          Timestamp aTimestamp = a['timestamp'];
+          Timestamp bTimestamp = b['timestamp'];
+          return bTimestamp.compareTo(aTimestamp);
+        });
+        completedDocs.sort((a, b) {
+          Timestamp aTimestamp = a['timestamp'];
+          Timestamp bTimestamp = b['timestamp'];
+          return bTimestamp.compareTo(aTimestamp);
+        });
+
+        if (unresolvedDocs.isNotEmpty && !_isVibrating) {
+          _startVibrating();
+          _sendPushNotification(unresolvedDocs.first);
+        } else if (unresolvedDocs.isEmpty && _isVibrating) {
+          _stopVibrating();
+        }
       });
-    } catch (e) {
-      print('Error initializing location and data: $e');
-    }
+    });
+  } catch (e) {
+    print('Error initializing location and data: $e');
   }
+}
+
 
   void _sendPushNotification(DocumentSnapshot doc) async {
     final data = doc.data() as Map<String, dynamic>?;
