@@ -33,6 +33,7 @@ dependencies:
   http: ^1.2.1
   googleapis_auth: ^1.6.0
   googleapis: ^13.1.0
+  flutter_launcher_icons: ^0.13.1
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +42,9 @@ dev_dependencies:
 
   flutter_lints: ^3.0.0
 
+flutter_launcher_icons:
+  android : true
+  image_path : "assets/hawastaff.png"
 
 flutter:
   uses-material-design: true
