@@ -37,27 +37,58 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
   }
 
   void _markAsResolved(BuildContext context) async {
-    await FirebaseFirestore.instance.collection('staff_emergency').doc(widget.emergencyData.id).update({
-      'status': 'completed',
-      'completedBy': FirebaseAuth.instance.currentUser!.uid,
-      'completedByName': FirebaseAuth.instance.currentUser!.displayName,
-      'completedAt': Timestamp.now(),
-    });
-    Navigator.pop(context);
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      DocumentSnapshot staffDoc = await FirebaseFirestore.instance.collection('staff').doc(currentUser.uid).get();
+      String staffName = staffDoc['name'] ?? 'Unknown';
+
+      await FirebaseFirestore.instance.collection('staff_emergency').doc(widget.emergencyData.id).update({
+        'status': 'completed',
+        'completedBy': currentUser.uid,
+        'completedByName': staffName,
+        'completedAt': Timestamp.now(),
+      });
+      Navigator.pop(context);
+    }
   }
 
   void _assignToEmergency(BuildContext context) async {
-    await FirebaseFirestore.instance.collection('staff_emergency').doc(widget.emergencyData.id).update({
-      'status': 'assigned',
-      'assignedTo': FirebaseAuth.instance.currentUser!.uid,
-      'assignedToName': FirebaseAuth.instance.currentUser!.displayName,
-    });
-    Navigator.pop(context);
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      DocumentSnapshot staffDoc = await FirebaseFirestore.instance.collection('staff').doc(currentUser.uid).get();
+      String staffName = staffDoc['fullName'] ?? 'Unknown';
+
+      await FirebaseFirestore.instance.collection('staff_emergency').doc(widget.emergencyData.id).update({
+        'status': 'assigned',
+        'assignedTo': currentUser.uid,
+        'assignedToName': staffName,
+      });
+      Navigator.pop(context);
+    }
   }
 
   Future<Map<String, dynamic>> _fetchUserDetails(String userId) async {
+    print('Fetching user details for userId: $userId');
     DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      print('User document exists: ${userDoc.exists}');
+      print('User data: ${userDoc.data()}');
+    } else {
+      print('User document does not exist');
+    }
     return userDoc.exists ? userDoc.data() as Map<String, dynamic> : {};
+  }
+
+  Future<Map<String, dynamic>> _fetchStaffDetails(String staffId) async {
+    print('Fetching staff details for staffId: $staffId');
+    DocumentSnapshot staffDoc = await FirebaseFirestore.instance.collection('staff').doc(staffId).get();
+    if (staffDoc.exists) {
+      print('Staff document exists: ${staffDoc.exists}');
+      print('Staff data: ${staffDoc.data()}');
+    } else {
+      print('Staff document does not exist');
+    }
+    return staffDoc.exists ? staffDoc.data() as Map<String, dynamic> : {};
   }
 
   Future<String> _fetchAddress(double latitude, double longitude) async {
@@ -128,11 +159,14 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
       );
     }
 
-    final String userId = data['userId'] ?? ''; // Ensure userId field exists
+    final String userId = data['userId'] ?? '';
     final GeoPoint location = data['location'] ?? GeoPoint(0, 0);
     final double latitude = location.latitude;
     final double longitude = location.longitude;
     final String assignedTo = data['assignedTo'] ?? '';
+    final String assignedToName = data['assignedToName'] ?? 'Unknown';
+    final String completedBy = data['completedBy'] ?? '';
+    final String completedByName = data['completedByName'] ?? 'Unknown';
 
     return Scaffold(
       backgroundColor: const Color.fromRGBO(2, 1, 34, 1),
@@ -272,30 +306,25 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
                             color: Colors.white,
                           ),
                         ),
-                        if (assignedTo.isEmpty) ...[
+                        if (data['status'] == 'assigned') ...[
                           SizedBox(height: 20),
-                          Center(
-                            child: ElevatedButton(
-                              onPressed: () => _assignToEmergency(context),
-                              child: Text('Assign to Emergency'),
-                            ),
-                          ),
-                        ] else ...[
-                          SizedBox(height: 20),
-                          Center(
-                            child: FutureBuilder<Map<String, dynamic>>(
-                              future: _fetchUserDetails(assignedTo),
-                              builder: (context, snapshot) {
-                                if (!snapshot.hasData) {
-                                  return CircularProgressIndicator();
-                                }
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: _fetchStaffDetails(assignedTo),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return Center(child: CircularProgressIndicator());
+                              } else if (snapshot.hasError) {
+                                return Center(child: Text('Error fetching staff details'));
+                              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                return Center(child: Text('Assigned to: $assignedToName (Code: Unknown, Position: Unknown)'));
+                              }
 
-                                final assignedStaffDetails = snapshot.data!;
-                                final String assignedToName = assignedStaffDetails['fullName'] ?? 'Unknown';
-                                final String staffCode = assignedStaffDetails['staffNumber'] ?? 'Unknown';
-                                final String position = assignedStaffDetails['position'] ?? 'Unknown';
+                              final staffDetails = snapshot.data!;
+                              final String staffCode = staffDetails['staffNumber'] ?? 'Unknown';
+                              final String position = staffDetails['position'] ?? 'Unknown';
 
-                                return Text(
+                              return Center(
+                                child: Text(
                                   'Assigned to: $assignedToName (Code: $staffCode, Position: $position)',
                                   style: TextStyle(
                                     fontSize: 16,
@@ -303,8 +332,46 @@ class _StaffEmergencyViewPageState extends State<StaffEmergencyViewPage> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                   textAlign: TextAlign.center,
-                                );
-                              },
+                                ),
+                              );
+                            },
+                          ),
+                        ] else if (data['status'] == 'completed') ...[
+                          SizedBox(height: 20),
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: _fetchStaffDetails(completedBy),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return Center(child: CircularProgressIndicator());
+                              } else if (snapshot.hasError) {
+                                return Center(child: Text('Error fetching staff details'));
+                              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                return Center(child: Text('Completed by: $completedByName (Code: Unknown, Position: Unknown)'));
+                              }
+
+                              final staffDetails = snapshot.data!;
+                              final String staffCode = staffDetails['staffNumber'] ?? 'Unknown';
+                              final String position = staffDetails['position'] ?? 'Unknown';
+
+                              return Center(
+                                child: Text(
+                                  'Completed by: $completedByName (Code: $staffCode, Position: $position)',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              );
+                            },
+                          ),
+                        ] else if (assignedTo.isEmpty) ...[
+                          SizedBox(height: 20),
+                          Center(
+                            child: ElevatedButton(
+                              onPressed: () => _assignToEmergency(context),
+                              child: Text('Assign to Emergency'),
                             ),
                           ),
                         ],
